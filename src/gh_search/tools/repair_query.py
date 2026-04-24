@@ -21,11 +21,12 @@ PROMPT_NAME = "repair"
 
 
 def repair_query(state: SharedAgentState, llm: LLMJsonCall) -> SharedAgentState:
+    errors_payload = [issue.model_dump(mode="json") for issue in state.validation.errors]
     user_message = (
         f"User query: {state.user_query}\n"
         f"Current structured query: "
         f"{json.dumps(_dump(state.structured_query), ensure_ascii=False)}\n"
-        f"Validation errors: {json.dumps(state.validation.errors, ensure_ascii=False)}\n"
+        f"Validation errors: {json.dumps(errors_payload, ensure_ascii=False)}\n"
         "Return a corrected structured query."
     )
 

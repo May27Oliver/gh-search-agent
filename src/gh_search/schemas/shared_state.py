@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gh_search.normalizers.keyword_rules import ValidationIssue
 from gh_search.schemas.enums import (
     ExecutionStatus,
     IntentStatus,
@@ -26,7 +27,7 @@ class Validation(BaseModel):
     model_config = _STRICT
 
     is_valid: bool = Field(...)
-    errors: list[str] = Field(...)
+    errors: list[ValidationIssue] = Field(...)
     missing_required_fields: list[str] = Field(...)
 
 

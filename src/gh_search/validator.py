@@ -1,20 +1,33 @@
-"""Semantic validator for StructuredQuery (TOOLS.md §9).
+"""Semantic validator for StructuredQuery (TOOLS.md §9, KEYWORD_TUNING_SPEC §8).
 
 Schema-level checks (types, enums, required fields, date format, sort/order
-consistency) live in StructuredQuery itself. This module only carries the
-remaining semantic invariants.
+consistency) live in StructuredQuery itself. This module carries the remaining
+semantic invariants:
+
+- emits `list[ValidationIssue]` (never strings) so validator / repair / logs /
+  scorer all consume the same structure (§8.0.5)
+- keyword canonicalization is deterministic and already applied by the
+  `validate_query` tool before this runs; keyword normalization outcomes are
+  audit-only and surface via `KeywordNormalizationTrace`, never as blocking
+  `Validation.errors` (KEYWORD_TUNING_SPEC §8.4, iter2 decision)
 """
 from __future__ import annotations
 
-from gh_search.schemas import StructuredQuery, Validation
+from gh_search.schemas import StructuredQuery, Validation, ValidationIssue
 
 
 def validate_structured_query(sq: StructuredQuery) -> Validation:
-    errors: list[str] = []
+    errors: list[ValidationIssue] = []
 
     if sq.min_stars is not None and sq.max_stars is not None and sq.min_stars > sq.max_stars:
         errors.append(
-            f"min_stars ({sq.min_stars}) must be <= max_stars ({sq.max_stars})"
+            ValidationIssue(
+                code="min_gt_max_stars",
+                message=(
+                    f"min_stars ({sq.min_stars}) must be <= max_stars ({sq.max_stars})"
+                ),
+                field="min_stars",
+            )
         )
 
     if (
@@ -23,11 +36,23 @@ def validate_structured_query(sq: StructuredQuery) -> Validation:
         and sq.created_after > sq.created_before
     ):
         errors.append(
-            f"created_after ({sq.created_after}) must be <= created_before ({sq.created_before})"
+            ValidationIssue(
+                code="created_after_gt_before",
+                message=(
+                    f"created_after ({sq.created_after}) must be <= "
+                    f"created_before ({sq.created_before})"
+                ),
+                field="created_after",
+            )
         )
 
     if _has_no_effective_condition(sq):
-        errors.append("at least one effective search condition is required")
+        errors.append(
+            ValidationIssue(
+                code="no_effective_condition",
+                message="at least one effective search condition is required",
+            )
+        )
 
     return Validation(is_valid=not errors, errors=errors, missing_required_fields=[])
 

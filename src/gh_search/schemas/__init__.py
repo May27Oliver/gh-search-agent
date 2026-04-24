@@ -1,4 +1,5 @@
 """Canonical domain schemas. Single source of truth for every field/enum."""
+from gh_search.normalizers.keyword_rules import ValidationIssue
 from gh_search.schemas.enums import (
     ExecutionStatus,
     IntentStatus,
@@ -8,7 +9,7 @@ from gh_search.schemas.enums import (
     ToolName,
 )
 from gh_search.schemas.eval import EvalResult
-from gh_search.schemas.logs import FinalState, RunLog, TurnLog
+from gh_search.schemas.logs import FinalState, KeywordNormalizationTrace, RunLog, TurnLog
 from gh_search.schemas.shared_state import (
     Control,
     Execution,
@@ -26,6 +27,7 @@ __all__ = [
     "FinalState",
     "IntentStatus",
     "IntentionJudge",
+    "KeywordNormalizationTrace",
     "OrderDir",
     "RunLog",
     "SharedAgentState",
@@ -35,4 +37,5 @@ __all__ = [
     "ToolName",
     "TurnLog",
     "Validation",
+    "ValidationIssue",
 ]

@@ -28,6 +28,7 @@ from gh_search.retrieval import (
     build_retrieval_artifact,
     has_retrieval_data,
 )
+from gh_search.normalizers import KEYWORD_RULES_VERSION
 from gh_search.schemas import (
     ExecutionStatus,
     FinalState,
@@ -134,6 +135,7 @@ def _cmd_query(args: argparse.Namespace) -> int:
         model_name=binding.model_name,
         provider_name=binding.provider_name,
         prompt_version=prompt_version,
+        keyword_rules_version=KEYWORD_RULES_VERSION,
         final_outcome=outcome,
         terminate_reason=(
             final_state.control.terminate_reason.value
@@ -358,7 +360,7 @@ def _render(
             [header, f"rejected ({terminate_val}): {reason}", f"suggestion: {suggestion}"]
         )
     if outcome == "validation_failed":
-        errs = "; ".join(state.validation.errors) or "unknown validation failure"
+        errs = "; ".join(issue.message for issue in state.validation.errors) or "unknown validation failure"
         return "\n".join([header, f"validation failed: {errs}", f"suggestion: {suggestion}"])
     if outcome == "execution_failed":
         return "\n".join(
@@ -398,7 +400,8 @@ def _per_turn_summary(session_dir: Path | None) -> list[str]:
         tool = t.get("tool_name")
         next_action = t.get("next_action")
         errors = t.get("validation_errors") or []
-        err_str = f" errors={errors}" if errors else ""
+        err_codes = [e["code"] for e in errors]
+        err_str = f" errors={err_codes}" if err_codes else ""
         out.append(
             f"  turn_{int(t['turn_index']):02d}: {tool} -> {next_action}{err_str}"
         )

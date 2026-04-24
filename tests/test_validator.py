@@ -44,13 +44,13 @@ def test_language_only_is_valid():
 def test_empty_query_rejected():
     result = validate_structured_query(_sq())
     assert result.is_valid is False
-    assert any("at least one" in e.lower() for e in result.errors)
+    assert any(e.code == "no_effective_condition" for e in result.errors)
 
 
 def test_min_greater_than_max_stars_rejected():
     result = validate_structured_query(_sq(keywords=["x"], min_stars=500, max_stars=100))
     assert result.is_valid is False
-    assert any("min_stars" in e and "max_stars" in e for e in result.errors)
+    assert any(e.code == "min_gt_max_stars" for e in result.errors)
 
 
 def test_created_after_greater_than_before_rejected():
@@ -58,7 +58,7 @@ def test_created_after_greater_than_before_rejected():
         _sq(keywords=["x"], created_after="2024-06-01", created_before="2024-01-01")
     )
     assert result.is_valid is False
-    assert any("created_after" in e and "created_before" in e for e in result.errors)
+    assert any(e.code == "created_after_gt_before" for e in result.errors)
 
 
 def test_equal_boundaries_accepted():

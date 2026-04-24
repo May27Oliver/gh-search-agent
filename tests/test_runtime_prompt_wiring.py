@@ -34,6 +34,7 @@ from gh_search.schemas import (
     StructuredQuery,
     ToolName,
     Validation,
+    ValidationIssue,
 )
 from gh_search.tools.intention_judge import intention_judge
 from gh_search.tools.parse_query import parse_query
@@ -123,7 +124,11 @@ def test_repair_query_uses_core_prompt_file_content():
         update={
             "structured_query": StructuredQuery.model_validate(_PARSE_OK),
             "validation": Validation(
-                is_valid=False, errors=["min_stars > max_stars"], missing_required_fields=[]
+                is_valid=False,
+                errors=[
+                    ValidationIssue(code="min_gt_max_stars", message="min_stars > max_stars")
+                ],
+                missing_required_fields=[],
             ),
         }
     )

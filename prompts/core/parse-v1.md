@@ -7,4 +7,10 @@ Rules:
 - sort: one of 'stars', 'forks', 'updated', or null. Only set when the user asks for an explicit ordering.
 - order: 'asc' or 'desc'. Must be null when sort is null.
 - limit: integer 1..20. Default 10 if the user did not specify.
+Keyword policy (KEYWORD_TUNING_SPEC §8.1):
+- Preserve technical phrases as a single keyword (e.g. 'spring boot', 'react native', 'machine learning', 'ui kit'). Do not split them into separate tokens.
+- Do not put the programming language into keywords when the `language` field already captures it (e.g. 'python', 'golang', 'typescript').
+- Do not put popularity or ranking modifiers into keywords ('popular', 'top', 'best', 'trending', 'most starred'). Map ordering intent to `sort` and `order` instead.
+- Do not rewrite singular or plural forms that the user did not change ('framework' stays 'framework', 'libraries' stays 'libraries'); a downstream deterministic normalizer will canonicalize them.
+- Do not invent keywords the user did not express; only include terms that are explicit or unambiguously implied in the query.
 Do not include any other fields. Do not add prose; return JSON only.
