@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from gh_search.eval.runner import run_smoke_eval
+from gh_search.eval.runner import DATASET_TODAY_ANCHOR, run_smoke_eval
 from gh_search.github import Repository
 from gh_search.llm import LLMResponse
 
@@ -204,3 +205,153 @@ def test_smoke_runner_reports_outcome_categories(tmp_path: Path):
     assert "rejected" in summary.outcome_counts
     assert summary.outcome_counts["success"] >= 1
     assert summary.outcome_counts["rejected"] >= 1
+
+
+# ITER5_DATE_TUNING_SPEC §8.1.2: DATASET_TODAY_ANCHOR must match dataset notes
+# (q013/q017 annotate relative dates against 2026-04-23) and must be threaded
+# through run_smoke_eval → run_agent_loop → parse_query.
+
+
+def test_dataset_today_anchor_matches_dataset_notes():
+    assert DATASET_TODAY_ANCHOR == date(2026, 4, 23)
+
+
+def test_run_smoke_eval_passes_today_anchor_to_loop(tmp_path: Path, monkeypatch):
+    seen_today: list = []
+
+    from gh_search.schemas import (
+        Control,
+        Execution,
+        ExecutionStatus,
+        IntentStatus,
+        IntentionJudge,
+        SharedAgentState,
+        StructuredQuery,
+        ToolName,
+        Validation,
+    )
+
+    def fake_loop(**kwargs):
+        seen_today.append(kwargs.get("today"))
+        # Build a minimal terminal state for the runner to serialize
+        return SharedAgentState(
+            run_id=kwargs["run_id"],
+            turn_index=1,
+            max_turns=kwargs.get("max_turns", 5),
+            user_query=kwargs["user_query"],
+            intention_judge=IntentionJudge(
+                intent_status=IntentStatus.SUPPORTED,
+                reason=None,
+                should_terminate=False,
+            ),
+            structured_query=StructuredQuery(
+                keywords=[],
+                language=None,
+                created_after=None,
+                created_before=None,
+                min_stars=None,
+                max_stars=None,
+                sort=None,
+                order=None,
+                limit=10,
+            ),
+            validation=Validation(is_valid=True, errors=[], missing_required_fields=[]),
+            compiled_query=None,
+            execution=Execution(
+                status=ExecutionStatus.SUCCESS,
+                response_status=200,
+                result_count=0,
+            ),
+            control=Control(
+                next_tool=None,
+                should_terminate=True,
+                terminate_reason=None,
+            ),
+        )
+
+    monkeypatch.setattr("gh_search.eval.runner.run_agent_loop", fake_loop)
+
+    run_smoke_eval(
+        dataset_path=Path("datasets/smoke_eval_dataset.json"),
+        llm=_scripted_llm(),
+        github=_fake_github(),
+        log_root=tmp_path / "logs",
+        eval_artifacts_root=tmp_path / "eval",
+        eval_run_id="smoke_today_1",
+        model_name="gpt-4.1-mini",
+        provider_name="openai",
+    )
+
+    assert seen_today, "run_agent_loop not invoked"
+    assert all(t == DATASET_TODAY_ANCHOR for t in seen_today), (
+        f"expected all calls to get DATASET_TODAY_ANCHOR, got {seen_today}"
+    )
+
+
+def test_run_smoke_eval_accepts_explicit_today_anchor_override(tmp_path: Path, monkeypatch):
+    seen_today: list = []
+
+    from gh_search.schemas import (
+        Control,
+        Execution,
+        ExecutionStatus,
+        IntentStatus,
+        IntentionJudge,
+        SharedAgentState,
+        StructuredQuery,
+        Validation,
+    )
+
+    def fake_loop(**kwargs):
+        seen_today.append(kwargs.get("today"))
+        return SharedAgentState(
+            run_id=kwargs["run_id"],
+            turn_index=1,
+            max_turns=kwargs.get("max_turns", 5),
+            user_query=kwargs["user_query"],
+            intention_judge=IntentionJudge(
+                intent_status=IntentStatus.SUPPORTED,
+                reason=None,
+                should_terminate=False,
+            ),
+            structured_query=StructuredQuery(
+                keywords=[],
+                language=None,
+                created_after=None,
+                created_before=None,
+                min_stars=None,
+                max_stars=None,
+                sort=None,
+                order=None,
+                limit=10,
+            ),
+            validation=Validation(is_valid=True, errors=[], missing_required_fields=[]),
+            compiled_query=None,
+            execution=Execution(
+                status=ExecutionStatus.SUCCESS,
+                response_status=200,
+                result_count=0,
+            ),
+            control=Control(
+                next_tool=None,
+                should_terminate=True,
+                terminate_reason=None,
+            ),
+        )
+
+    monkeypatch.setattr("gh_search.eval.runner.run_agent_loop", fake_loop)
+
+    override = date(2030, 1, 1)
+    run_smoke_eval(
+        dataset_path=Path("datasets/smoke_eval_dataset.json"),
+        llm=_scripted_llm(),
+        github=_fake_github(),
+        log_root=tmp_path / "logs",
+        eval_artifacts_root=tmp_path / "eval",
+        eval_run_id="smoke_today_2",
+        model_name="gpt-4.1-mini",
+        provider_name="openai",
+        today_anchor=override,
+    )
+
+    assert all(t == override for t in seen_today)
