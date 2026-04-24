@@ -325,3 +325,75 @@ def test_invalid_max_turns_rejected():
             github=_fake_github([]),
             max_turns=0,
         )
+
+
+# ITER5_DATE_TUNING_SPEC §8.1.1: run_agent_loop must forward `today` kwarg
+# to parse_query so eval path can pin DATASET_TODAY_ANCHOR.
+def test_run_agent_loop_forwards_today_to_parse_query(monkeypatch):
+    from datetime import date
+
+    captured: dict = {}
+
+    def fake_parse_query(state, *, llm, today=None):
+        captured["today"] = today
+        # route to validate_query so loop exits cleanly
+        from gh_search.schemas import Control, ToolName
+
+        return state.model_copy(
+            update={
+                "control": Control(
+                    next_tool=ToolName.VALIDATE_QUERY,
+                    should_terminate=True,
+                    terminate_reason=None,
+                )
+            }
+        )
+
+    monkeypatch.setattr("gh_search.agent.loop.parse_query", fake_parse_query)
+
+    llm = _scripted_llm(
+        {"intent_status": "supported", "reason": None, "should_terminate": False},
+    )
+    run_agent_loop(
+        user_query="find python repos from last year",
+        run_id="r_today",
+        llm=llm,
+        github=_fake_github([]),
+        max_turns=5,
+        today=date(2026, 4, 23),
+    )
+
+    assert captured["today"] == date(2026, 4, 23)
+
+
+def test_run_agent_loop_today_defaults_to_none_when_not_provided(monkeypatch):
+    captured: dict = {}
+
+    def fake_parse_query(state, *, llm, today=None):
+        captured["today"] = today
+        from gh_search.schemas import Control, ToolName
+
+        return state.model_copy(
+            update={
+                "control": Control(
+                    next_tool=ToolName.VALIDATE_QUERY,
+                    should_terminate=True,
+                    terminate_reason=None,
+                )
+            }
+        )
+
+    monkeypatch.setattr("gh_search.agent.loop.parse_query", fake_parse_query)
+
+    llm = _scripted_llm(
+        {"intent_status": "supported", "reason": None, "should_terminate": False},
+    )
+    run_agent_loop(
+        user_query="anything",
+        run_id="r_no_today",
+        llm=llm,
+        github=_fake_github([]),
+        max_turns=5,
+    )
+
+    assert captured["today"] is None

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from gh_search.agent import run_agent_loop
@@ -45,6 +45,12 @@ class SmokeSummary:
     outcome_counts: dict[str, int]
 
 
+# ITER5_DATE_TUNING_SPEC §7.1.3: dataset q013 / q017 notes fix the annotation
+# anchor at 2026-04-23. Pin eval `today` to this constant so relative-date
+# rules resolve consistently across reruns regardless of wall-clock date.
+DATASET_TODAY_ANCHOR: date = date(2026, 4, 23)
+
+
 def run_smoke_eval(
     dataset_path: Path,
     llm: LLMJsonCall,
@@ -56,6 +62,7 @@ def run_smoke_eval(
     provider_name: str,
     prompt_version: str | None = None,
     max_turns: int = 5,
+    today_anchor: date = DATASET_TODAY_ANCHOR,
 ) -> SmokeSummary:
     dataset = json.loads(Path(dataset_path).read_text())
     run_dir = eval_artifacts_root / eval_run_id
@@ -92,6 +99,7 @@ def run_smoke_eval(
                 max_turns=max_turns,
                 results_sink=results,
                 session_logger=session_logger,
+                today=today_anchor,
             )
             ended_at = _now()
 

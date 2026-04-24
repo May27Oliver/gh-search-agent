@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from gh_search.github import GitHubClient, Repository
 from gh_search.llm import LLMJsonCall, LLMResponse
@@ -43,6 +43,8 @@ def run_agent_loop(
     max_turns: int = 5,
     results_sink: list[Repository] | None = None,
     session_logger: SessionLogger | None = None,
+    *,
+    today: date | None = None,
 ) -> SharedAgentState:
     if max_turns < 1:
         raise ValueError(f"max_turns must be >= 1, got {max_turns}")
@@ -62,7 +64,12 @@ def run_agent_loop(
 
         started = time.perf_counter()
         new_state = _dispatch(
-            state, tool, llm=recording_llm, github=github, results_sink=results_sink
+            state,
+            tool,
+            llm=recording_llm,
+            github=github,
+            results_sink=results_sink,
+            today=today,
         )
         latency_ms = int((time.perf_counter() - started) * 1000)
         new_state = new_state.model_copy(update={"turn_index": turn})
@@ -130,11 +137,12 @@ def _dispatch(
     llm: LLMJsonCall,
     github: GitHubClient,
     results_sink: list[Repository] | None,
+    today: date | None = None,
 ) -> SharedAgentState:
     if tool is ToolName.INTENTION_JUDGE:
         return intention_judge(state, llm=llm)
     if tool is ToolName.PARSE_QUERY:
-        return parse_query(state, llm=llm)
+        return parse_query(state, llm=llm, today=today)
     if tool is ToolName.VALIDATE_QUERY:
         return validate_query(state)
     if tool is ToolName.REPAIR_QUERY:
