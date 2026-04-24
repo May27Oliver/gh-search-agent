@@ -1,0 +1,827 @@
+[
+  {
+    "id": "q001",
+    "input_query": "find me some popular react component libraries",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "測試最基本的 keyword 搜尋，需要推斷 language=JavaScript/TypeScript 與排序偏好",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "react",
+        "component",
+        "library"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'popular' 視為 sort=stars desc。react 可能是 JavaScript 或 TypeScript，保守不推定 language。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q002",
+    "input_query": "show me top 10 python machine learning repos",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "明確包含 limit=10 與 language=python，測試 limit 與 language 的正確抽取",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "machine learning"
+      ],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'top 10' 對應 limit=10 並隱含 sort=stars desc。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q003",
+    "input_query": "rust web frameworks",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "短查詢測試 keyword 與 language 的簡單對應",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "web",
+        "framework"
+      ],
+      "language": "Rust",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "未指定排序或人氣訊號，移除原本 stars desc 的過度推定。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正 over_inference：原版本把一般主題查詢誤標成熱門排序。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q004",
+    "input_query": "any good golang cli tools out there?",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "口語化查詢，測試模型對非正式表達的理解",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "cli",
+        "tool"
+      ],
+      "language": "Go",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "golang 對應 language=Go；\"good\" 不足以穩定推定 sort=stars。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正 over_inference：口語化稱讚詞不足以當作排序指令。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q005",
+    "input_query": "kubernetes operator examples",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "主題性 keyword 搜尋，無明顯 language 提示",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "kubernetes",
+        "operator",
+        "example"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "無 language、排序、時間條件，採保守輸出。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q006",
+    "input_query": "I'm looking for typescript state management libraries",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "完整句型測試 keyword 抽取與 language=TypeScript",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "state management",
+        "library"
+      ],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "未提及排序或人氣訊號，sort/order 保守留 null。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q007",
+    "input_query": "show graphql server implementations sorted by stars",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 sort=stars 的明確指令抽取",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "graphql",
+        "server"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'sorted by stars' 明確指定 sort=stars，未明說 order 但預設 desc。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q008",
+    "input_query": "open source LLM inference engines",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "當前流行主題，測試多字 keyword 的處理",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "LLM",
+        "inference",
+        "engine"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'open source' 視為 GitHub 普遍屬性，不作為 keyword。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q009",
+    "input_query": "recommend some vue 3 admin dashboard templates",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試版本號與具體 keyword 的保留",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "vue 3",
+        "admin",
+        "dashboard",
+        "template"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'recommend some' 不足以明確排序；Vue 3 可能為 JS/TS，不推定 language。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q010",
+    "input_query": "newest ai agent frameworks",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 'newest' 是否會對應到 sort=updated 或 created_after",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "ai",
+        "agent",
+        "framework"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "updated",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'newest' 在 repository search 常對應 sort=updated desc；若解讀為 created 則應另建分支，此處採較通用選項。",
+    "review_status": "needs_revision",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "\"newest\" 無法被目前 schema 精確表示。現有 schema 缺少按 created time 排序能力，sort=updated 只是近似代理，建議改寫題目或移至 failure/edge-case dataset。",
+    "recommended_dataset": "failure_case"
+  },
+  {
+    "id": "q011",
+    "input_query": "python scraping libraries created after 2023 with at least 1000 stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "同時測試 language、created_after、min_stars 三個條件",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "scraping",
+        "library"
+      ],
+      "language": "Python",
+      "created_after": "2024-01-01",
+      "created_before": null,
+      "min_stars": 1000,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "\"created after 2023\" 應解讀為 2024-01-01 之後；\"at least 1000\" → min_stars=1000。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正日期邊界：after 2023 不應包含 2023 年。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q012",
+    "input_query": "give me top 5 go repos made before 2020 sorted by stars desc",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 limit、language、created_before、sort、order 五個條件組合",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": null,
+      "created_before": "2019-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 5
+    },
+    "notes": "\"before 2020\" 以嚴格語意處理為 2019-12-31 之前；無具體主題，keywords 為空。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正日期邊界：before 2020 不應包含 2020-01-01。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q013",
+    "input_query": "trending rust projects from last year with over 500 stars but under 10k",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 min_stars、max_stars、相對時間 created_after 的抽取",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Rust",
+      "created_after": "2025-01-01",
+      "created_before": "2025-12-31",
+      "min_stars": 501,
+      "max_stars": 9999,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "以 2026-04-23 為標註基準，\"last year\" 解讀為 2025 全年；\"over 500\" → 501，\"under 10k\" → 9999；\"trending\" 以 stars desc 作為最接近代理。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正嚴格數值邊界，並保留相對時間的標註基準。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q014",
+    "input_query": "javascript testing frameworks between 2019 and 2022",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試日期區間對應到 created_after 與 created_before",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "testing",
+        "framework"
+      ],
+      "language": "JavaScript",
+      "created_after": "2019-01-01",
+      "created_before": "2022-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'between 2019 and 2022' 解讀為含首尾年份的區間。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q015",
+    "input_query": "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "同時測試 limit、language、min_stars 與 keyword 組合",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "ORM",
+        "library"
+      ],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 2001,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 20
+    },
+    "notes": "\"popular\" → sort=stars desc；\"more than 2k stars\" 嚴格解讀為 min_stars=2001。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正嚴格數值邊界：more than 2k 不應等於 2000。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q016",
+    "input_query": "c++ game engines sorted by most recently updated",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 sort=updated、order=desc 與特殊字元 c++ 的處理",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "game",
+        "engine"
+      ],
+      "language": "C++",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "updated",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'most recently updated' → sort=updated, order=desc。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q017",
+    "input_query": "small python utilities under 100 stars created this year",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 max_stars、相對年份對應 created_after",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "utility"
+      ],
+      "language": "Python",
+      "created_after": "2026-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": 99,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "\"this year\" 以 2026-04-23 為基準 → created_after=2026-01-01；\"under 100 stars\" 嚴格解讀為 max_stars=99。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正嚴格數值邊界：under 100 不應包含 100。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q018",
+    "input_query": "list 15 java spring boot starter projects from 2024 ranked by stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 limit、language、created_after、sort 多重條件",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "spring boot",
+        "starter"
+      ],
+      "language": "Java",
+      "created_after": "2024-01-01",
+      "created_before": "2024-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 15
+    },
+    "notes": "'from 2024' 解讀為 2024 全年；'ranked by stars' → sort=stars desc。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q019",
+    "input_query": "good repos for learning programming",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "過度模糊，沒有明確 language 或 keyword，測試是否會胡亂填充條件",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "learning",
+        "programming"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "查詢過於模糊，未明示 language、star 或排序，保守保留 null。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q020",
+    "input_query": "popular stuff on github",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "極度模糊查詢，測試系統是否會請求 clarification 或保守處理",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "極度模糊，無主題關鍵字；僅 'popular' 可合理對應 sort=stars desc，其餘保留 null。",
+    "review_status": "needs_revision",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "查詢過度模糊，沒有穩定可標註的主題或可執行搜尋條件。依目前系統 validation 規則，這題更適合 failure case dataset。",
+    "recommended_dataset": "failure_case"
+  },
+  {
+    "id": "q021",
+    "input_query": "show me some cool swift repos not too old but not too new",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "時間條件描述模糊，測試模型是否會過度詮釋成具體日期",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Swift",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'not too old but not too new' 無法安全對應具體日期，依規則保留 null；'cool' 為裝飾詞。",
+    "review_status": "needs_revision",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "\"not too old but not too new\" 無法穩定映射到具體日期範圍；若 ground truth 把日期全留空，會錯誤地忽略原題核心約束。建議改寫或移至 failure case dataset。",
+    "recommended_dataset": "failure_case"
+  },
+  {
+    "id": "q022",
+    "input_query": "I want repos about apple",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "keyword 語意歧義（水果/公司/產品），測試是否會做過度推測",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "apple"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'apple' 語意歧義（水果/公司/產品），保留原關鍵字不腦補。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q023",
+    "input_query": "pythn web frameework sorted by strs",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "多個 typo（pythn/frameework/strs），測試模型的 typo tolerance",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "web",
+        "framework"
+      ],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "修正 typo:pythn→Python、frameework→framework、strs→stars。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q024",
+    "input_query": "javscript chatbot libs with min 500 starz plz",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "混入口語縮寫（plz）與 typo，測試模型對 noisy 輸入的穩定度",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "chatbot",
+        "library"
+      ],
+      "language": "JavaScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 500,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "修正 typo:javscript→JavaScript、starz→stars、libs→library；'plz' 為噪音。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q025",
+    "input_query": "gimme top10 go repoz created aftr 2022!!!",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "多重 typo、合併數字、標點噪音，測試抽取的 robustness",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "\"top10\" → limit=10 並隱含 sort=stars desc；\"aftr 2022\" 應解讀為 2023-01-01 之後。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正日期邊界：after 2022 不應包含 2022 年。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q026",
+    "input_query": "rect native ui kit     with    lots     of stars",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "typo 加上多餘空白，測試 whitespace 與 keyword 辨識",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "react native",
+        "ui kit"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "修正 typo:rect→react;'lots of stars' → sort=stars desc，但無具體數字，min_stars 保留 null。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q027",
+    "input_query": "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+    "case_type": "multilingual",
+    "language": "zh-TW",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "繁體中文查詢混合英文 keyword，測試 min_stars 與 language 的中文理解",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "scraping",
+        "crawler"
+      ],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 1001,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "\"熱門\" → sort=stars desc；\"star 數超過 1000\" 嚴格解讀為 min_stars=1001；將「爬蟲套件」正規化為 scraping/crawler。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正嚴格數值邊界。",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q028",
+    "input_query": "推荐几个2023年以后创建的golang微服务框架，按star排序",
+    "case_type": "multilingual",
+    "language": "zh-CN",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "簡體中文測試 created_after、sort、language 的多條件抽取",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "microservice",
+        "framework"
+      ],
+      "language": "Go",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'2023年以后' → created_after=2023-01-01；'按star排序' → sort=stars desc；'几个' 未明確數量，採預設 limit=10。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "Approved after human review.",
+    "recommended_dataset": "eval"
+  },
+  {
+    "id": "q029",
+    "input_query": "日本語で書かれたReactのサンプルプロジェクトを10個教えて",
+    "case_type": "multilingual",
+    "language": "ja",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "日文查詢測試 limit=10 與 keyword 抽取，並考驗多語系 tokenization",
+    "ground_truth_structured_query": {
+      "keywords": [
+        "React",
+        "sample"
+      ],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'日本語で書かれた' 指人類語言（日文），非 GitHub programming language 欄位可表達，故 language 保留 null，此需求建議後續以 README 語言條件處理；'10個' → limit=10。",
+    "review_status": "needs_revision",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "\"日本語で書かれた\" 指的是自然語言內容，不是 GitHub repository programming language；目前 schema 無法表達，這題不適合直接作為正式 eval item。",
+    "recommended_dataset": "failure_case"
+  },
+  {
+    "id": "q030",
+    "input_query": "找一些 star 超過 500 但少於 100 的 rust 專案",
+    "case_type": "adversarial",
+    "language": "zh-TW",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "衝突條件 min_stars>500 且 max_stars<100 邏輯不可能成立，測試模型是否會標記矛盾或盲目照抽",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Rust",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 501,
+      "max_stars": 99,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "保留原始衝突條件：\"超過 500\" → 501，\"少於 100\" → 99；依規則不自動修正，交由 validator 或 failure analysis 處理。",
+    "review_status": "approved",
+    "reviewer": "Oliver Chen",
+    "reviewed_at": "2026-04-23",
+    "review_notes": "修正嚴格數值邊界，保留衝突作為 adversarial case。",
+    "recommended_dataset": "eval"
+  }
+]

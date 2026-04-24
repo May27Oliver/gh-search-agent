@@ -1,0 +1,86 @@
+[
+  {
+    "id": "q012",
+    "input_query": "give me top 5 go repos made before 2020 sorted by stars desc",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": null,
+      "created_before": "2019-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 5
+    },
+    "expected_predicted_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": null,
+      "created_before": "2019-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 5
+    },
+    "source": "eval_gpt41mini_20260424 per_item_results.jsonl line 12",
+    "notes": "Frozen as regression guard (§7). Any model row in model_matrix must keep this is_correct=true."
+  },
+  {
+    "id": "q015",
+    "input_query": "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+    "ground_truth_structured_query": {
+      "keywords": ["ORM", "library"],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 2001,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 20
+    },
+    "expected_predicted_structured_query": {
+      "keywords": ["orm", "library"],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 2001,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 20
+    },
+    "source": "eval_gpt41mini_20260424 per_item_results.jsonl line 15",
+    "notes": "Passes via case-insensitive keyword compare (ORM vs orm). Locking in this behavior prevents regression if scorer normalization changes."
+  },
+  {
+    "id": "q025",
+    "input_query": "gimme top10 go repoz created aftr 2022!!!",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "expected_predicted_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "source": "eval_gpt41mini_20260424 per_item_results.jsonl line 25",
+    "notes": "Frozen as regression guard (§7)."
+  }
+]

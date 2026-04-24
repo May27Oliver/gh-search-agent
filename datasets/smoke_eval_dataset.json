@@ -1,0 +1,47 @@
+[
+  {
+    "id": "smoke_001",
+    "input_query": "find me some popular react component libraries",
+    "case_type": "normal",
+    "language": "en",
+    "expect_rejection": false,
+    "ground_truth_structured_query": {
+      "keywords": ["react", "component", "library"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    }
+  },
+  {
+    "id": "smoke_002",
+    "input_query": "Python logistics optimization repos with at least 100 stars created after 2023",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "expect_rejection": false,
+    "ground_truth_structured_query": {
+      "keywords": ["logistics", "optimization"],
+      "language": "Python",
+      "created_after": "2024-01-01",
+      "created_before": null,
+      "min_stars": 100,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    }
+  },
+  {
+    "id": "smoke_003",
+    "input_query": "show me trending tweets about AI this week",
+    "case_type": "unsupported",
+    "language": "en",
+    "expect_rejection": true,
+    "expected_terminate_reason": "unsupported_intent",
+    "ground_truth_structured_query": null
+  }
+]

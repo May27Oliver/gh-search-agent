@@ -1,0 +1,23 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime artifacts - keep the tree but not session contents.
+artifacts/logs/sessions/**/*
+artifacts/eval/**/*
+!artifacts/logs/sessions/.gitkeep
+!artifacts/eval/.gitkeep
+
+reference_project
+.claude

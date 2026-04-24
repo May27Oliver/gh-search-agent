@@ -1,0 +1,482 @@
+[
+  {
+    "id": "q001",
+    "input_query": "find me some popular react component libraries",
+    "ground_truth_structured_query": {
+      "keywords": ["react", "component", "library"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'popular' 視為 sort=stars desc。react 可能是 JavaScript 或 TypeScript，保守不推定 language。"
+  },
+  {
+    "id": "q002",
+    "input_query": "show me top 10 python machine learning repos",
+    "ground_truth_structured_query": {
+      "keywords": ["machine learning"],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'top 10' 對應 limit=10 並隱含 sort=stars desc。"
+  },
+  {
+    "id": "q003",
+    "input_query": "rust web frameworks",
+    "ground_truth_structured_query": {
+      "keywords": ["web", "framework"],
+      "language": "Rust",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "未指定限制與排序，採預設 limit=10；'frameworks' 使用者常期待熱門結果，但此處無 popularity 指示詞，sort 可能視政策填 null。此版依常見 GitHub UX 預設 stars desc。"
+  },
+  {
+    "id": "q004",
+    "input_query": "any good golang cli tools out there?",
+    "ground_truth_structured_query": {
+      "keywords": ["cli", "tool"],
+      "language": "Go",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'good' 語意較弱，保守可填 null；此版取 stars desc 以符合常見意圖。golang 對應 language=Go。"
+  },
+  {
+    "id": "q005",
+    "input_query": "kubernetes operator examples",
+    "ground_truth_structured_query": {
+      "keywords": ["kubernetes", "operator", "example"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "無 language、排序、時間條件，採保守輸出。"
+  },
+  {
+    "id": "q006",
+    "input_query": "I'm looking for typescript state management libraries",
+    "ground_truth_structured_query": {
+      "keywords": ["state management", "library"],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "未提及排序或人氣訊號，sort/order 保守留 null。"
+  },
+  {
+    "id": "q007",
+    "input_query": "show graphql server implementations sorted by stars",
+    "ground_truth_structured_query": {
+      "keywords": ["graphql", "server"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'sorted by stars' 明確指定 sort=stars，未明說 order 但預設 desc。"
+  },
+  {
+    "id": "q008",
+    "input_query": "open source LLM inference engines",
+    "ground_truth_structured_query": {
+      "keywords": ["LLM", "inference", "engine"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'open source' 視為 GitHub 普遍屬性，不作為 keyword。"
+  },
+  {
+    "id": "q009",
+    "input_query": "recommend some vue 3 admin dashboard templates",
+    "ground_truth_structured_query": {
+      "keywords": ["vue 3", "admin", "dashboard", "template"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'recommend some' 不足以明確排序；Vue 3 可能為 JS/TS，不推定 language。"
+  },
+  {
+    "id": "q010",
+    "input_query": "newest ai agent frameworks",
+    "ground_truth_structured_query": {
+      "keywords": ["ai", "agent", "framework"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "updated",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'newest' 在 repository search 常對應 sort=updated desc；若解讀為 created 則應另建分支，此處採較通用選項。"
+  },
+  {
+    "id": "q011",
+    "input_query": "python scraping libraries created after 2023 with at least 1000 stars",
+    "ground_truth_structured_query": {
+      "keywords": ["scraping", "library"],
+      "language": "Python",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": 1000,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'created after 2023' 保守取 2023-01-01（含）；'at least 1000' → min_stars=1000。"
+  },
+  {
+    "id": "q012",
+    "input_query": "give me top 5 go repos made before 2020 sorted by stars desc",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": null,
+      "created_before": "2020-01-01",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 5
+    },
+    "notes": "'before 2020' 取 2020-01-01；無具體主題，keywords 為空。"
+  },
+  {
+    "id": "q013",
+    "input_query": "trending rust projects from last year with over 500 stars but under 10k",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Rust",
+      "created_after": "2025-01-01",
+      "created_before": "2025-12-31",
+      "min_stars": 500,
+      "max_stars": 10000,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "以今日 2026-04-23 為基準，'last year' 解讀為 2025 全年；'trending' 對應 sort=stars desc（亦可解讀為 updated，此處採常見 GitHub 偏好）。"
+  },
+  {
+    "id": "q014",
+    "input_query": "javascript testing frameworks between 2019 and 2022",
+    "ground_truth_structured_query": {
+      "keywords": ["testing", "framework"],
+      "language": "JavaScript",
+      "created_after": "2019-01-01",
+      "created_before": "2022-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'between 2019 and 2022' 解讀為含首尾年份的區間。"
+  },
+  {
+    "id": "q015",
+    "input_query": "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+    "ground_truth_structured_query": {
+      "keywords": ["ORM", "library"],
+      "language": "TypeScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 2000,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 20
+    },
+    "notes": "'popular' → sort=stars desc；'more than 2k stars' 保守取 min_stars=2000（含）。"
+  },
+  {
+    "id": "q016",
+    "input_query": "c++ game engines sorted by most recently updated",
+    "ground_truth_structured_query": {
+      "keywords": ["game", "engine"],
+      "language": "C++",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "updated",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'most recently updated' → sort=updated, order=desc。"
+  },
+  {
+    "id": "q017",
+    "input_query": "small python utilities under 100 stars created this year",
+    "ground_truth_structured_query": {
+      "keywords": ["utility"],
+      "language": "Python",
+      "created_after": "2026-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": 100,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'this year' 以今日 2026-04-23 為基準 → created_after=2026-01-01；'under 100 stars' → max_stars=100。'small' 作為裝飾詞不進 keywords。"
+  },
+  {
+    "id": "q018",
+    "input_query": "list 15 java spring boot starter projects from 2024 ranked by stars",
+    "ground_truth_structured_query": {
+      "keywords": ["spring boot", "starter"],
+      "language": "Java",
+      "created_after": "2024-01-01",
+      "created_before": "2024-12-31",
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 15
+    },
+    "notes": "'from 2024' 解讀為 2024 全年；'ranked by stars' → sort=stars desc。"
+  },
+  {
+    "id": "q019",
+    "input_query": "good repos for learning programming",
+    "ground_truth_structured_query": {
+      "keywords": ["learning", "programming"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "查詢過於模糊，未明示 language、star 或排序，保守保留 null。"
+  },
+  {
+    "id": "q020",
+    "input_query": "popular stuff on github",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "極度模糊，無主題關鍵字；僅 'popular' 可合理對應 sort=stars desc，其餘保留 null。"
+  },
+  {
+    "id": "q021",
+    "input_query": "show me some cool swift repos not too old but not too new",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Swift",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'not too old but not too new' 無法安全對應具體日期，依規則保留 null；'cool' 為裝飾詞。"
+  },
+  {
+    "id": "q022",
+    "input_query": "I want repos about apple",
+    "ground_truth_structured_query": {
+      "keywords": ["apple"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'apple' 語意歧義（水果/公司/產品），保留原關鍵字不腦補。"
+  },
+  {
+    "id": "q023",
+    "input_query": "pythn web frameework sorted by strs",
+    "ground_truth_structured_query": {
+      "keywords": ["web", "framework"],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "修正 typo:pythn→Python、frameework→framework、strs→stars。"
+  },
+  {
+    "id": "q024",
+    "input_query": "javscript chatbot libs with min 500 starz plz",
+    "ground_truth_structured_query": {
+      "keywords": ["chatbot", "library"],
+      "language": "JavaScript",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 500,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "修正 typo:javscript→JavaScript、starz→stars、libs→library；'plz' 為噪音。"
+  },
+  {
+    "id": "q025",
+    "input_query": "gimme top10 go repoz created aftr 2022!!!",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Go",
+      "created_after": "2022-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'top10' → limit=10 並隱含 sort=stars desc；'aftr 2022' → created_after=2022-01-01。"
+  },
+  {
+    "id": "q026",
+    "input_query": "rect native ui kit     with    lots     of stars",
+    "ground_truth_structured_query": {
+      "keywords": ["react native", "ui kit"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "修正 typo:rect→react;'lots of stars' → sort=stars desc，但無具體數字，min_stars 保留 null。"
+  },
+  {
+    "id": "q027",
+    "input_query": "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+    "ground_truth_structured_query": {
+      "keywords": ["scraping", "crawler"],
+      "language": "Python",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 1000,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'熱門' → sort=stars desc；'star 數超過 1000' 保守取 min_stars=1000（含）；'爬蟲' 對應 scraping/crawler。"
+  },
+  {
+    "id": "q028",
+    "input_query": "推荐几个2023年以后创建的golang微服务框架，按star排序",
+    "ground_truth_structured_query": {
+      "keywords": ["microservice", "framework"],
+      "language": "Go",
+      "created_after": "2023-01-01",
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": "stars",
+      "order": "desc",
+      "limit": 10
+    },
+    "notes": "'2023年以后' → created_after=2023-01-01；'按star排序' → sort=stars desc；'几个' 未明確數量，採預設 limit=10。"
+  },
+  {
+    "id": "q029",
+    "input_query": "日本語で書かれたReactのサンプルプロジェクトを10個教えて",
+    "ground_truth_structured_query": {
+      "keywords": ["React", "sample"],
+      "language": null,
+      "created_after": null,
+      "created_before": null,
+      "min_stars": null,
+      "max_stars": null,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "'日本語で書かれた' 指人類語言（日文），非 GitHub programming language 欄位可表達，故 language 保留 null，此需求建議後續以 README 語言條件處理；'10個' → limit=10。"
+  },
+  {
+    "id": "q030",
+    "input_query": "找一些 star 超過 500 但少於 100 的 rust 專案",
+    "ground_truth_structured_query": {
+      "keywords": [],
+      "language": "Rust",
+      "created_after": null,
+      "created_before": null,
+      "min_stars": 500,
+      "max_stars": 100,
+      "sort": null,
+      "order": null,
+      "limit": 10
+    },
+    "notes": "衝突條件:min_stars=500 但 max_stars=100 邏輯上無交集。依規則保留原衝突，不自動修正，交由上游 validator 或人工處理。"
+  }
+]

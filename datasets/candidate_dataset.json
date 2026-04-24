@@ -1,0 +1,242 @@
+[
+  {
+    "id": "q001",
+    "input_query": "find me some popular react component libraries",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "測試最基本的 keyword 搜尋，需要推斷 language=JavaScript/TypeScript 與排序偏好"
+  },
+  {
+    "id": "q002",
+    "input_query": "show me top 10 python machine learning repos",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "明確包含 limit=10 與 language=python，測試 limit 與 language 的正確抽取"
+  },
+  {
+    "id": "q003",
+    "input_query": "rust web frameworks",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "短查詢測試 keyword 與 language 的簡單對應"
+  },
+  {
+    "id": "q004",
+    "input_query": "any good golang cli tools out there?",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "口語化查詢，測試模型對非正式表達的理解"
+  },
+  {
+    "id": "q005",
+    "input_query": "kubernetes operator examples",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "主題性 keyword 搜尋，無明顯 language 提示"
+  },
+  {
+    "id": "q006",
+    "input_query": "I'm looking for typescript state management libraries",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "完整句型測試 keyword 抽取與 language=TypeScript"
+  },
+  {
+    "id": "q007",
+    "input_query": "show graphql server implementations sorted by stars",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 sort=stars 的明確指令抽取"
+  },
+  {
+    "id": "q008",
+    "input_query": "open source LLM inference engines",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "easy",
+    "why_this_case_is_useful": "當前流行主題，測試多字 keyword 的處理"
+  },
+  {
+    "id": "q009",
+    "input_query": "recommend some vue 3 admin dashboard templates",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試版本號與具體 keyword 的保留"
+  },
+  {
+    "id": "q010",
+    "input_query": "newest ai agent frameworks",
+    "case_type": "normal",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 'newest' 是否會對應到 sort=updated 或 created_after"
+  },
+  {
+    "id": "q011",
+    "input_query": "python scraping libraries created after 2023 with at least 1000 stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "同時測試 language、created_after、min_stars 三個條件"
+  },
+  {
+    "id": "q012",
+    "input_query": "give me top 5 go repos made before 2020 sorted by stars desc",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 limit、language、created_before、sort、order 五個條件組合"
+  },
+  {
+    "id": "q013",
+    "input_query": "trending rust projects from last year with over 500 stars but under 10k",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 min_stars、max_stars、相對時間 created_after 的抽取"
+  },
+  {
+    "id": "q014",
+    "input_query": "javascript testing frameworks between 2019 and 2022",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試日期區間對應到 created_after 與 created_before"
+  },
+  {
+    "id": "q015",
+    "input_query": "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "同時測試 limit、language、min_stars 與 keyword 組合"
+  },
+  {
+    "id": "q016",
+    "input_query": "c++ game engines sorted by most recently updated",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "測試 sort=updated、order=desc 與特殊字元 c++ 的處理"
+  },
+  {
+    "id": "q017",
+    "input_query": "small python utilities under 100 stars created this year",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 max_stars、相對年份對應 created_after"
+  },
+  {
+    "id": "q018",
+    "input_query": "list 15 java spring boot starter projects from 2024 ranked by stars",
+    "case_type": "compound_constraints",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "測試 limit、language、created_after、sort 多重條件"
+  },
+  {
+    "id": "q019",
+    "input_query": "good repos for learning programming",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "過度模糊，沒有明確 language 或 keyword，測試是否會胡亂填充條件"
+  },
+  {
+    "id": "q020",
+    "input_query": "popular stuff on github",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "極度模糊查詢，測試系統是否會請求 clarification 或保守處理"
+  },
+  {
+    "id": "q021",
+    "input_query": "show me some cool swift repos not too old but not too new",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "時間條件描述模糊，測試模型是否會過度詮釋成具體日期"
+  },
+  {
+    "id": "q022",
+    "input_query": "I want repos about apple",
+    "case_type": "ambiguous",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "keyword 語意歧義（水果/公司/產品），測試是否會做過度推測"
+  },
+  {
+    "id": "q023",
+    "input_query": "pythn web frameework sorted by strs",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "多個 typo（pythn/frameework/strs），測試模型的 typo tolerance"
+  },
+  {
+    "id": "q024",
+    "input_query": "javscript chatbot libs with min 500 starz plz",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "混入口語縮寫（plz）與 typo，測試模型對 noisy 輸入的穩定度"
+  },
+  {
+    "id": "q025",
+    "input_query": "gimme top10 go repoz created aftr 2022!!!",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "多重 typo、合併數字、標點噪音，測試抽取的 robustness"
+  },
+  {
+    "id": "q026",
+    "input_query": "rect native ui kit     with    lots     of stars",
+    "case_type": "typo_or_noisy",
+    "language": "en",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "typo 加上多餘空白，測試 whitespace 與 keyword 辨識"
+  },
+  {
+    "id": "q027",
+    "input_query": "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+    "case_type": "multilingual",
+    "language": "zh-TW",
+    "difficulty": "medium",
+    "why_this_case_is_useful": "繁體中文查詢混合英文 keyword，測試 min_stars 與 language 的中文理解"
+  },
+  {
+    "id": "q028",
+    "input_query": "推荐几个2023年以后创建的golang微服务框架，按star排序",
+    "case_type": "multilingual",
+    "language": "zh-CN",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "簡體中文測試 created_after、sort、language 的多條件抽取"
+  },
+  {
+    "id": "q029",
+    "input_query": "日本語で書かれたReactのサンプルプロジェクトを10個教えて",
+    "case_type": "multilingual",
+    "language": "ja",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "日文查詢測試 limit=10 與 keyword 抽取，並考驗多語系 tokenization"
+  },
+  {
+    "id": "q030",
+    "input_query": "找一些 star 超過 500 但少於 100 的 rust 專案",
+    "case_type": "adversarial",
+    "language": "zh-TW",
+    "difficulty": "hard",
+    "why_this_case_is_useful": "衝突條件 min_stars>500 且 max_stars<100 邏輯不可能成立，測試模型是否會標記矛盾或盲目照抽"
+  }
+]
