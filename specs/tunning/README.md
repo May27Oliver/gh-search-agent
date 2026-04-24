@@ -20,6 +20,11 @@
   - singular/plural 容錯
   - modifier stopwords
   - multilingual / typo canonicalization
+- [ITER3_INTENTION_JUDGE_TUNING_SPEC.md](ITER3_INTENTION_JUDGE_TUNING_SPEC.md)
+  - Iteration 3 的 `intention_judge` 調整規格
+  - dataset-aligned permissive gate
+  - recoverable reject 題目與測試策略
+  - cross-model 驗證與通過標準
 
 使用方式：
 

@@ -135,3 +135,64 @@ def test_malformed_llm_response_defaults_to_ambiguous_termination():
     assert new_state.intention_judge.intent_status is IntentStatus.AMBIGUOUS
     assert new_state.control.should_terminate is True
     assert new_state.control.terminate_reason is TerminateReason.AMBIGUOUS_QUERY
+
+
+# ITER3_INTENTION_JUDGE_TUNING_SPEC §8.1: lock the 7 dataset-aligned queries
+# to `supported` so a stubbed-supported LLM response routes them into
+# parse_query. These are contract tests for control flow — prompt-vs-LLM
+# judgment is validated out-of-band via `gh-search smoke` (§8.2, §9.2).
+ITER3_SUPPORTED_QUERIES = [
+    ("q004", "any good golang cli tools out there?"),
+    ("q009", "recommend some vue 3 admin dashboard templates"),
+    ("q019", "good repos for learning programming"),
+    ("q020", "popular stuff on github"),
+    ("q021", "show me some cool swift repos not too old but not too new"),
+    ("q022", "I want repos about apple"),
+    ("q030", "找一些 star 超過 500 但少於 100 的 rust 專案"),
+]
+
+
+@pytest.mark.parametrize("qid,query", ITER3_SUPPORTED_QUERIES, ids=[q[0] for q in ITER3_SUPPORTED_QUERIES])
+def test_iter3_supported_query_routes_to_parse_query(qid: str, query: str):
+    llm, _ = _stub_llm(
+        {"intent_status": "supported", "reason": None, "should_terminate": False}
+    )
+    state = _fresh_state(query)
+    new_state = intention_judge(state, llm=llm)
+
+    assert new_state.intention_judge.intent_status is IntentStatus.SUPPORTED
+    assert new_state.intention_judge.should_terminate is False
+    assert new_state.control.next_tool is ToolName.PARSE_QUERY
+    assert new_state.control.should_terminate is False
+    assert new_state.control.terminate_reason is None
+
+
+# ITER3_INTENTION_JUDGE_TUNING_SPEC §8.3: off-domain negative set must still
+# terminate even after the gate is relaxed. Guards against over-recovery.
+ITER3_UNSUPPORTED_QUERIES = [
+    ("prs_in_repo", "show me PRs in repo X"),
+    ("users_named", "find users named alice"),
+    ("code_snippets", "give me code snippets for redis retry logic"),
+]
+
+
+@pytest.mark.parametrize(
+    "case_id,query",
+    ITER3_UNSUPPORTED_QUERIES,
+    ids=[c[0] for c in ITER3_UNSUPPORTED_QUERIES],
+)
+def test_iter3_off_domain_query_terminates(case_id: str, query: str):
+    llm, _ = _stub_llm(
+        {
+            "intent_status": "unsupported",
+            "reason": "target is not a repository search",
+            "should_terminate": True,
+        }
+    )
+    state = _fresh_state(query)
+    new_state = intention_judge(state, llm=llm)
+
+    assert new_state.intention_judge.intent_status is IntentStatus.UNSUPPORTED
+    assert new_state.control.next_tool is ToolName.FINALIZE
+    assert new_state.control.should_terminate is True
+    assert new_state.control.terminate_reason is TerminateReason.UNSUPPORTED_INTENT
