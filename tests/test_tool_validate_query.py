@@ -97,7 +97,7 @@ def test_missing_structured_query_terminates_with_validation_failed():
     new_state = validate_query(state)
 
     assert new_state.validation.is_valid is False
-    assert any("structured_query" in e.lower() for e in new_state.validation.errors)
+    assert any(e.code == "parse_failed" for e in new_state.validation.errors)
     assert new_state.control.next_tool is ToolName.FINALIZE
     assert new_state.control.should_terminate is True
     assert new_state.control.terminate_reason is TerminateReason.VALIDATION_FAILED

@@ -11,6 +11,7 @@ from gh_search.schemas import (
     StructuredQuery,
     ToolName,
     Validation,
+    ValidationIssue,
 )
 from gh_search.llm import LLMResponse
 from gh_search.tools import repair_query
@@ -44,7 +45,13 @@ def _state_after_validate():
         structured_query=_invalid_sq(),
         validation=Validation(
             is_valid=False,
-            errors=["min_stars (500) must be <= max_stars (100)"],
+            errors=[
+                ValidationIssue(
+                    code="min_gt_max_stars",
+                    message="min_stars (500) must be <= max_stars (100)",
+                    field="min_stars",
+                )
+            ],
             missing_required_fields=[],
         ),
         compiled_query=None,

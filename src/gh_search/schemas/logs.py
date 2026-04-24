@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gh_search.normalizers.keyword_rules import ValidationIssue
 from gh_search.schemas.enums import IntentStatus, ToolName
 from gh_search.schemas.shared_state import SharedAgentState
 from gh_search.schemas.structured_query import StructuredQuery
@@ -22,11 +23,24 @@ class RunLog(BaseModel):
     model_name: str = Field(...)
     provider_name: str = Field(...)
     prompt_version: str = Field(...)
+    keyword_rules_version: str = Field(...)
     final_outcome: str = Field(...)
     terminate_reason: str | None = Field(...)
     started_at: str = Field(...)
     ended_at: str = Field(...)
     log_version: str = Field(...)
+
+
+class KeywordNormalizationTrace(BaseModel):
+    """Per-turn trace for keyword canonicalization (KEYWORD_TUNING_SPEC §8.4)."""
+
+    model_config = _STRICT
+
+    prompt_version: str | None = Field(...)
+    keyword_rules_version: str | None = Field(...)
+    raw_keywords: list[str] = Field(...)
+    normalized_keywords: list[str] = Field(...)
+    violations: list[ValidationIssue] = Field(...)
 
 
 class TurnLog(BaseModel):
@@ -41,7 +55,8 @@ class TurnLog(BaseModel):
     raw_model_output: str | None = Field(...)
     parsed_structured_query: StructuredQuery | None = Field(...)
     validation_result: bool | None = Field(...)
-    validation_errors: list[str] = Field(...)
+    validation_errors: list[ValidationIssue] = Field(...)
+    keyword_normalization_trace: KeywordNormalizationTrace | None = Field(...)
     compiled_query: str | None = Field(...)
     response_status: int | None = Field(...)
     final_outcome: str | None = Field(...)

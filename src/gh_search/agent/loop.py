@@ -7,12 +7,18 @@ from datetime import datetime, timezone
 from gh_search.github import GitHubClient, Repository
 from gh_search.llm import LLMJsonCall, LLMResponse
 from gh_search.logger import SessionLogger
+from gh_search.normalizers import (
+    KEYWORD_RULES_VERSION,
+    find_keyword_violations,
+    normalize_keywords,
+)
 from gh_search.schemas import (
     Control,
     Execution,
     ExecutionStatus,
     IntentionJudge,
     IntentStatus,
+    KeywordNormalizationTrace,
     SharedAgentState,
     TerminateReason,
     ToolName,
@@ -64,13 +70,14 @@ def run_agent_loop(
         raw_model_output = raw_box[-1] if raw_box else None
 
         if session_logger is not None:
+            trace = _keyword_trace(state, new_state, tool, llm)
             session_logger.append_turn(
-                _turn_log(new_state, session_id, tool, latency_ms, raw_model_output)
+                _turn_log(new_state, session_id, tool, latency_ms, raw_model_output, trace)
             )
             session_logger.write_turn_artifact(
                 turn_index=turn,
                 tool_name=tool,
-                payload=_artifact_payload(state, new_state, raw_model_output),
+                payload=_artifact_payload(state, new_state, raw_model_output, tool, llm, trace),
             )
 
         state = new_state
@@ -153,6 +160,7 @@ def _turn_log(
     tool: ToolName,
     latency_ms: int,
     raw_model_output: str | None,
+    keyword_trace: KeywordNormalizationTrace | None,
 ) -> TurnLog:
     return TurnLog(
         session_id=session_id,
@@ -165,6 +173,7 @@ def _turn_log(
         parsed_structured_query=state.structured_query,
         validation_result=state.validation.is_valid if tool is ToolName.VALIDATE_QUERY else None,
         validation_errors=list(state.validation.errors),
+        keyword_normalization_trace=keyword_trace,
         compiled_query=state.compiled_query,
         response_status=state.execution.response_status,
         final_outcome=None,
@@ -190,16 +199,74 @@ def _record_llm(llm: LLMJsonCall, raw_box: list[str]) -> LLMJsonCall:
 
 
 def _artifact_payload(
-    prev: SharedAgentState, new: SharedAgentState, raw_model_output: str | None
+    prev: SharedAgentState,
+    new: SharedAgentState,
+    raw_model_output: str | None,
+    tool: ToolName,
+    llm: LLMJsonCall,
+    keyword_trace: KeywordNormalizationTrace | None,
 ) -> dict:
     prev_dump = prev.model_dump(mode="json")
     new_dump = new.model_dump(mode="json")
     diff = {k: new_dump[k] for k in new_dump if new_dump[k] != prev_dump.get(k)}
-    return {
+    payload = {
         "input_state": prev_dump,
         "raw_model_output": raw_model_output,
         "output_state": new_dump,
         "state_diff": diff,
+        "prompt_version": _prompt_version_for(tool, llm),
+        "keyword_rules_version": KEYWORD_RULES_VERSION,
     }
+    if keyword_trace is not None:
+        payload["keyword_normalization_trace"] = keyword_trace.model_dump(mode="json")
+    return payload
+
+
+def _prompt_version_for(tool: ToolName, llm: LLMJsonCall) -> str | None:
+    model = getattr(llm, "model_name", None)
+    if tool is ToolName.PARSE_QUERY and model is not None:
+        return f"parse-core-v1 + parse-{model}-v1"
+    if tool is ToolName.REPAIR_QUERY and model is not None:
+        return f"repair-core-v1 + repair-{model}-v1"
+    if tool is ToolName.INTENTION_JUDGE and model is not None:
+        return f"intention-core-v1 + intention-{model}-v1"
+    return None
+
+
+def _keyword_trace(
+    prev: SharedAgentState,
+    new: SharedAgentState,
+    tool: ToolName,
+    llm: LLMJsonCall,
+) -> KeywordNormalizationTrace | None:
+    """Emit a trace every time keywords cross the normalization boundary.
+
+    Captured on parse / validate / repair turns so that downstream analysis
+    can tell whether a change came from prompt policy or from deterministic
+    rules (KEYWORD_TUNING_SPEC §8.4).
+    """
+    if tool not in {ToolName.PARSE_QUERY, ToolName.VALIDATE_QUERY, ToolName.REPAIR_QUERY}:
+        return None
+
+    source_sq = prev.structured_query if tool is ToolName.VALIDATE_QUERY else new.structured_query
+    result_sq = new.structured_query
+    if source_sq is None and result_sq is None:
+        return None
+
+    raw_keywords = list(source_sq.keywords) if source_sq is not None else []
+    language = source_sq.language if source_sq is not None else None
+    normalized = (
+        list(result_sq.keywords)
+        if result_sq is not None
+        else normalize_keywords(raw_keywords, language=language)
+    )
+    violations = find_keyword_violations(raw_keywords, language=language)
+    return KeywordNormalizationTrace(
+        prompt_version=_prompt_version_for(tool, llm),
+        keyword_rules_version=KEYWORD_RULES_VERSION,
+        raw_keywords=raw_keywords,
+        normalized_keywords=normalized,
+        violations=violations,
+    )
 
 

@@ -14,6 +14,12 @@
   - 區分 scorer brittleness vs parser error vs multilingual/translation miss
 - [ITER0_NOTES.md](ITER0_NOTES.md)
   - Iteration 0 執行 log、完成項目、blockers、下一步建議
+- [KEYWORD_TUNING_SPEC.md](KEYWORD_TUNING_SPEC.md)
+  - `keywords` 欄位的 tuning policy
+  - technical phrase dictionary
+  - singular/plural 容錯
+  - modifier stopwords
+  - multilingual / typo canonicalization
 
 使用方式：
 

@@ -106,11 +106,26 @@ def test_intent_status_enum_rejected():
         SharedAgentState.model_validate(payload)
 
 
-def test_validation_errors_must_be_list_of_str():
+def test_validation_errors_must_be_list_of_validation_issue():
+    # Errors carry structured ValidationIssue entries (KEYWORD_TUNING_SPEC §8.0.5);
+    # plain strings or objects missing required fields must be rejected.
     payload = _initial_state()
-    payload["validation"]["errors"] = [{"not": "a string"}]
+    payload["validation"]["errors"] = ["plain string not allowed"]
     with pytest.raises(ValidationError):
         SharedAgentState.model_validate(payload)
+
+    payload["validation"]["errors"] = [{"not": "a valid issue"}]
+    with pytest.raises(ValidationError):
+        SharedAgentState.model_validate(payload)
+
+
+def test_validation_errors_accept_validation_issue_dict():
+    payload = _initial_state()
+    payload["validation"]["errors"] = [
+        {"code": "language_leak", "message": "python leaked into keywords"}
+    ]
+    st = SharedAgentState.model_validate(payload)
+    assert st.validation.errors[0].code == "language_leak"
 
 
 def test_control_terminate_reason_enum():

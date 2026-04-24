@@ -1,7 +1,8 @@
 """Deterministic scorer for StructuredQuery predictions.
 
-Primary metric is normalized exact match (EVAL.md §7):
-  - keywords compared as multisets, case-insensitive
+Primary metric is normalized exact match (EVAL.md §7, KEYWORD_TUNING_SPEC §8.3):
+  - keywords are compared after `normalize_keywords(..., language=)` on BOTH
+    sides — scorer never does its own lowercase / sort / merge / lemmatize
   - string fields (language) compared case-insensitive
   - dates compared as YYYY-MM-DD strings
   - ints and enums compared exactly
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from gh_search.normalizers import normalize_keywords
 from gh_search.schemas import StructuredQuery
 
 _FIELDS = (
@@ -101,12 +103,16 @@ def _compare(gt: StructuredQuery, pred: StructuredQuery) -> tuple[dict[str, bool
     results: dict[str, bool] = {}
     mismatches: list[str] = []
 
-    # keywords: multiset, case-insensitive
-    gt_kw = sorted(k.lower() for k in gt.keywords)
-    pr_kw = sorted(k.lower() for k in pred.keywords)
+    # keywords: route both sides through the shared normalizer so parser,
+    # validator, and scorer can never disagree on canonicalization
+    # (KEYWORD_TUNING_SPEC §8.3).
+    gt_kw = sorted(normalize_keywords(list(gt.keywords), language=gt.language))
+    pr_kw = sorted(normalize_keywords(list(pred.keywords), language=pred.language))
     results["keywords"] = gt_kw == pr_kw
     if not results["keywords"]:
-        mismatches.append(f"keywords: gt={gt.keywords} pred={pred.keywords}")
+        mismatches.append(
+            f"keywords: gt={gt_kw} pred={pr_kw} (raw gt={gt.keywords} pred={pred.keywords})"
+        )
 
     # language: case-insensitive, null-safe
     results["language"] = _eq_case_insensitive(gt.language, pred.language)

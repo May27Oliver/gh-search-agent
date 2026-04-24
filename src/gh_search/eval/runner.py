@@ -19,6 +19,7 @@ from gh_search.eval.scorer import score_item
 from gh_search.github import GitHubClient, Repository
 from gh_search.llm import LLMJsonCall
 from gh_search.logger import SessionLogger
+from gh_search.normalizers import KEYWORD_RULES_VERSION
 from gh_search.retrieval import (
     build_retrieval_artifact,
     has_retrieval_data,
@@ -280,6 +281,7 @@ def _write_session_finalization(
         model_name=model_name,
         provider_name=provider_name,
         prompt_version=prompt_version,
+        keyword_rules_version=KEYWORD_RULES_VERSION,
         final_outcome=outcome,
         terminate_reason=(
             final_state.control.terminate_reason.value
