@@ -17,7 +17,9 @@ from gh_search.normalizers import normalize_keywords
 from gh_search.normalizers.keyword_rules import _LANGUAGE_TOKEN_TO_FACET
 from gh_search.schemas import (
     Control,
+    OrderDir,
     SharedAgentState,
+    SortField,
     StructuredQuery,
     TerminateReason,
     ToolName,
@@ -79,16 +81,23 @@ def _normalize_structured_query(
     normalized_min_stars, normalized_max_stars = _normalize_star_bounds(
         sq.min_stars, sq.max_stars, user_query
     )
+    normalized_sort, normalized_order = _normalize_ranking(
+        sq.sort, sq.order, user_query
+    )
 
     keywords_changed = normalized_keywords != list(sq.keywords)
     language_changed = suppressed_language != sq.language
     min_stars_changed = normalized_min_stars != sq.min_stars
     max_stars_changed = normalized_max_stars != sq.max_stars
+    sort_changed = normalized_sort != sq.sort
+    order_changed = normalized_order != sq.order
     if not (
         keywords_changed
         or language_changed
         or min_stars_changed
         or max_stars_changed
+        or sort_changed
+        or order_changed
     ):
         return sq
 
@@ -101,6 +110,10 @@ def _normalize_structured_query(
         update["min_stars"] = normalized_min_stars
     if max_stars_changed:
         update["max_stars"] = normalized_max_stars
+    if sort_changed:
+        update["sort"] = normalized_sort
+    if order_changed:
+        update["order"] = normalized_order
     return sq.model_copy(update=update)
 
 
@@ -221,3 +234,53 @@ def _normalize_star_bounds(
         elif match.group("incl_upper") is not None:
             new_max = num
     return (new_min, new_max)
+
+
+# ---------------------------------------------------------------------------
+# Iter11 ranking intent (§3) — query-driven sort/order rewrite.
+# ---------------------------------------------------------------------------
+
+# Ranking lexicon (ITER11_SORT_DEFAULTS_SPEC §3.1). Multi-word English phrases
+# require the whole phrase; ASCII tokens use word boundaries so `most` does
+# not match inside `almost` and `popular` does not match inside `popularity`.
+# CJK phrases tolerate the connected (`按star排序`) and single-spaced
+# (`按 star 排序`) variants per §3.1 last bullet.
+_RANKING_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bpopular\b", re.IGNORECASE),
+    re.compile(r"\btrending\b", re.IGNORECASE),
+    re.compile(r"\branked\s+by\s+stars\b", re.IGNORECASE),
+    re.compile(r"\bsorted\s+by\s+stars\b", re.IGNORECASE),
+    re.compile(r"\blots\s+of\s+stars\b", re.IGNORECASE),
+    re.compile(r"\bmost\s+stars\b", re.IGNORECASE),
+    re.compile(r"\btop\s*\d+\b", re.IGNORECASE),
+    re.compile(r"按\s*stars?\s*排序", re.IGNORECASE),
+    re.compile(r"熱門"),
+)
+
+
+def _has_ranking_intent(user_query: str) -> bool:
+    return any(p.search(user_query) for p in _RANKING_PATTERNS)
+
+
+def _normalize_ranking(
+    sort: SortField | None,
+    order: OrderDir | None,
+    user_query: str,
+) -> tuple[SortField | None, OrderDir | None]:
+    """Fill `sort=stars`, `order=desc` when `user_query` carries ranking intent.
+
+    Implements ITER11 §3 query-driven rewrite:
+      - ranking intent absent → return (sort, order) verbatim (§3.3 do not clear)
+      - ranking intent present + parser sort is None or already STARS →
+        return (STARS, DESC)
+      - ranking intent present + parser chose a non-stars sort
+        (FORKS / UPDATED) → return (sort, order) verbatim (§3.3 末段 do not
+        overwrite)
+
+    Pure function; no side effects.
+    """
+    if not _has_ranking_intent(user_query):
+        return (sort, order)
+    if sort is None or sort is SortField.STARS:
+        return (SortField.STARS, OrderDir.DESC)
+    return (sort, order)
