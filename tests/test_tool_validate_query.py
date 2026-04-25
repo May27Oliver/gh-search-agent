@@ -120,3 +120,66 @@ def test_preserves_other_state_fields():
     assert new_state.run_id == state.run_id
     assert new_state.user_query == state.user_query
     assert new_state.intention_judge == state.intention_judge
+
+
+# ITER6_LANGUAGE_OVERINFERENCE_SPEC §6.1 / §7.2: language facet contraction
+# is applied inside _normalize_structured_query, in the same snapshot as
+# keyword normalization, before semantic validation.
+
+
+def _sq_with(language=None, keywords=None):
+    return StructuredQuery.model_validate(
+        {
+            "keywords": keywords or [],
+            "language": language,
+            "created_after": None,
+            "created_before": None,
+            "min_stars": None,
+            "max_stars": None,
+            "sort": "stars",
+            "order": "desc",
+            "limit": 10,
+        }
+    )
+
+
+def test_language_cleared_when_query_has_no_explicit_evidence():
+    """q001 GPT pattern: parser inferred JS from `react`, no explicit lang."""
+    state = _base_state(
+        user_query="find me some popular react component libraries",
+        structured_query=_sq_with(language="JavaScript", keywords=["react", "component"]),
+    )
+    new_state = validate_query(state)
+
+    assert new_state.structured_query.language is None
+    # contracting language should not break validation downstream
+    assert new_state.validation.is_valid is True
+    assert new_state.control.next_tool is ToolName.COMPILE_GITHUB_QUERY
+
+
+def test_language_preserved_when_query_has_explicit_evidence():
+    state = _base_state(
+        user_query="any good golang cli tools out there?",
+        structured_query=_sq_with(language="Go", keywords=["cli", "tool"]),
+    )
+    new_state = validate_query(state)
+
+    assert new_state.structured_query.language == "Go"
+    assert new_state.validation.is_valid is True
+
+
+def test_language_normalization_runs_before_semantic_validation():
+    """If language is the only effective condition and gets cleared, the empty
+    query should fall to repair (no_effective_condition), not bypass it."""
+    state = _base_state(
+        user_query="recommend some vue 3 admin dashboard templates",
+        structured_query=_sq_with(language="Vue", keywords=[]),
+    )
+    new_state = validate_query(state)
+
+    # Vue gets cleared (framework, not language), and with empty keywords
+    # the validator should now flag no_effective_condition → repair.
+    assert new_state.structured_query.language is None
+    assert new_state.validation.is_valid is False
+    assert any(e.code == "no_effective_condition" for e in new_state.validation.errors)
+    assert new_state.control.next_tool is ToolName.REPAIR_QUERY
