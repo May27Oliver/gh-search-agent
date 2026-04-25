@@ -185,3 +185,150 @@ def test_iter8_multilingual_canonicalization_through_validate_query(
     assert new_state.validation.is_valid is True, (
         f"{qid}: post-canonicalization keywords should be semantically valid"
     )
+
+
+# ---------------------------------------------------------------------------
+# Iter9 language over-inference suppression integration
+# (ITER9_LANGUAGE_OVERINFERENCE_RESIDUAL_SPEC §7.2)
+# ---------------------------------------------------------------------------
+
+
+def _sq_with_facets(
+    keywords: list[str], language: str | None
+) -> StructuredQuery:
+    return StructuredQuery.model_validate(
+        {
+            "keywords": keywords,
+            "language": language,
+            "created_after": None,
+            "created_before": None,
+            "min_stars": None,
+            "max_stars": None,
+            "sort": None,
+            "order": None,
+            "limit": 10,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "qid,user_query,raw_keywords,raw_language",
+    [
+        # q001 GPT: "find me some popular react component libraries" + pred='JavaScript'.
+        (
+            "q001_gpt",
+            "find me some popular react component libraries",
+            ["react", "component", "library"],
+            "JavaScript",
+        ),
+        # q009 GPT: pred hallucinates language='Vue' from framework token.
+        (
+            "q009_gpt",
+            "recommend some vue 3 admin dashboard templates",
+            ["vue 3", "admin", "dashboard", "template"],
+            "Vue",
+        ),
+        # q029 GPT: Japanese query, pred infers JavaScript from React framework.
+        (
+            "q029_gpt",
+            "日本語で書かれたReactのサンプルプロジェクトを10個教えて",
+            ["react", "sample"],
+            "JavaScript",
+        ),
+        # q029 CLA: contract-only — language must be cleared even if keywords incomplete.
+        (
+            "q029_cla_contract",
+            "日本語で書かれたReactのサンプルプロジェクトを10個教えて",
+            ["sample"],
+            "JavaScript",
+        ),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter9_language_overinference_cleared_through_validate_query(
+    qid: str,
+    user_query: str,
+    raw_keywords: list[str],
+    raw_language: str,
+) -> None:
+    sq = _sq_with_facets(raw_keywords, language=raw_language)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.language is None, (
+        f"{qid}: language should be cleared when user_query has no explicit anchor"
+    )
+
+
+@pytest.mark.parametrize(
+    "qid,user_query,raw_keywords,raw_language",
+    [
+        # q018 GPT shape: explicit 'java' anchor.
+        (
+            "q018_java",
+            "list 15 java spring boot starter projects from 2024 ranked by stars",
+            ["spring boot", "starter"],
+            "Java",
+        ),
+        # q015 GPT shape: explicit 'TypeScript' anchor.
+        (
+            "q015_typescript",
+            "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+            ["orm", "library"],
+            "TypeScript",
+        ),
+        # q027 shape: explicit 'python' anchor in CJK-mixed query.
+        (
+            "q027_python",
+            "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+            ["scraping", "crawler"],
+            "Python",
+        ),
+        # q013 shape: explicit 'rust' anchor.
+        (
+            "q013_rust",
+            "trending rust projects from last year with over 500 stars but under 10k",
+            ["trending"],
+            "Rust",
+        ),
+        # alias path: 'golang' must preserve Go.
+        (
+            "alias_golang",
+            "golang cli tools with lots of stars",
+            ["cli", "tool"],
+            "Go",
+        ),
+        # q023 typo: 'pythn' must preserve Python.
+        (
+            "q023_pythn",
+            "pythn web frameework sorted by strs",
+            ["web", "framework"],
+            "Python",
+        ),
+        # q024 typo: 'javscript' must preserve JavaScript.
+        (
+            "q024_javscript",
+            "javscript chatbot libs with min 500 starz plz",
+            ["chatbot", "library"],
+            "JavaScript",
+        ),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter9_explicit_language_preserved_through_validate_query(
+    qid: str,
+    user_query: str,
+    raw_keywords: list[str],
+    raw_language: str,
+) -> None:
+    sq = _sq_with_facets(raw_keywords, language=raw_language)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.language == raw_language, (
+        f"{qid}: language should be preserved when user_query carries an explicit anchor"
+    )

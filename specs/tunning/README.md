@@ -39,6 +39,10 @@
   - CJK / Japanese keyword canonicalization downstream 化
   - `q027` / `q028` / `q029` multilingual target pairs
   - `project` / `japanese` contextual drop，不升成全域 stopword
+- [ITER9_LANGUAGE_OVERINFERENCE_RESIDUAL_SPEC.md](ITER9_LANGUAGE_OVERINFERENCE_RESIDUAL_SPEC.md)
+  - residual language over-inference downstream suppression
+  - `q001 GPT` / `q029 GPT` primary targets
+  - `q009 GPT` / `q029 CLA` contract-only language cleanup
 
 使用方式：
 
