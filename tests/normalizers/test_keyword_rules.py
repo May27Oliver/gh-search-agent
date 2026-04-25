@@ -671,3 +671,241 @@ class TestIter7DecorationSharedContract:
         }
         assert "projects" not in normalized
         assert flagged == {"projects"}
+
+
+# ---------------------------------------------------------------------------
+# Iter8 — Multilingual canonicalization
+# (ITER8_MULTILINGUAL_CANONICALIZATION_SPEC §3.1, §7.1, §7.3)
+# ---------------------------------------------------------------------------
+
+
+class TestIter8MultilingualCanonicalization:
+    """§7.1 — single-token CJK compound rewrites + bag-level contextual rules."""
+
+    # --- Positive cases (the 5 patterns from §3.1) -----------------------
+
+    def test_scraping_plus_kit_rewrites_to_scraping_crawler(self) -> None:
+        # q027 GPT/CLA: parser emits ['scraping', '套件']; bag rule replaces
+        # '套件' with 'crawler' when 'scraping' co-occurs (§3.1 rule 2).
+        assert normalize_keywords(["scraping", "套件"]) == ["scraping", "crawler"]
+
+    def test_scraping_plus_kit_order_insensitive(self) -> None:
+        # §3.1 rule 2: order-insensitive; parser may emit '套件' first.
+        assert normalize_keywords(["套件", "scraping"]) == ["crawler", "scraping"]
+
+    def test_cjk_crawler_kit_compound_rewrites_to_scraping_crawler(self) -> None:
+        # q027 DSK: parser emits the joined CJK compound (§3.1 rule 1).
+        assert normalize_keywords(["爬蟲套件"]) == ["scraping", "crawler"]
+
+    def test_microservice_framework_compound_splits(self) -> None:
+        # q028 GPT: '微服务框架' (no space, simplified Chinese) -> two canonical
+        # English tokens (§3.1 rule 3). Distinct from the existing space-split
+        # case 'microservice framework' which Stage 0 already handles.
+        assert normalize_keywords(["微服务框架"]) == ["microservice", "framework"]
+
+    def test_sample_project_japanese_compound_rewrites_to_sample_only(self) -> None:
+        # q029 GPT: 'サンプルプロジェクト' is a Japanese compound; spec §3.1 rule
+        # 4 maps it to 'sample' (only) — no orphan 'project' left behind.
+        assert normalize_keywords(["react", "サンプルプロジェクト"]) == [
+            "react",
+            "sample",
+        ]
+
+    def test_sample_project_japanese_trio_drops_project_and_japanese(self) -> None:
+        # q029 DSK: parser emits all three canonical English tokens; §3.1
+        # rule 5 narrow contextual drop fires when all three co-occur.
+        assert normalize_keywords(
+            ["react", "sample", "project", "japanese"]
+        ) == ["react", "sample"]
+
+    def test_trio_drop_other_tokens_unaffected(self) -> None:
+        # §3.1 rule 5: "其他 token 如 react 不影響觸發"; topic-bearing tokens
+        # outside the trio must survive.
+        assert normalize_keywords(
+            ["vue", "sample", "project", "japanese", "starter"]
+        ) == ["vue", "sample", "starter"]
+
+    # --- Guard cases (§7.1: lock against accidental global promotion) -----
+
+    def test_kit_alone_kept_no_global_alias(self) -> None:
+        # §3.2: '套件' must NOT become a global '套件' -> 'crawler' alias.
+        assert normalize_keywords(["套件"]) == ["套件"]
+
+    def test_project_alone_kept_no_global_stopword(self) -> None:
+        # §3.2: 'project' (singular) must NOT become a global stopword.
+        assert normalize_keywords(["project"]) == ["project"]
+
+    def test_japanese_alone_kept_no_global_stopword(self) -> None:
+        # §3.2: 'japanese' must NOT become a global stopword.
+        assert normalize_keywords(["japanese"]) == ["japanese"]
+
+    def test_sample_project_pair_kept_no_japanese_no_drop(self) -> None:
+        # Trio not satisfied (missing 'japanese'); both tokens survive.
+        assert normalize_keywords(["sample", "project"]) == ["sample", "project"]
+
+    def test_sample_japanese_pair_kept_no_project_no_drop(self) -> None:
+        # Trio not satisfied (missing 'project'); both tokens survive.
+        assert normalize_keywords(["sample", "japanese"]) == ["sample", "japanese"]
+
+    def test_project_japanese_pair_kept_no_sample_no_drop(self) -> None:
+        # Trio not satisfied (missing 'sample'); both tokens survive.
+        assert normalize_keywords(["project", "japanese"]) == ["project", "japanese"]
+
+    def test_microservice_framework_split_pair_unaffected(self) -> None:
+        # Already-canonical English pair must pass through untouched.
+        assert normalize_keywords(["microservice", "framework"]) == [
+            "microservice",
+            "framework",
+        ]
+
+    def test_react_sample_pair_unaffected(self) -> None:
+        # Common React-sample query without trio noise must pass through.
+        assert normalize_keywords(["react", "sample"]) == ["react", "sample"]
+
+    # --- Idempotence -----------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "keywords",
+        [
+            ["scraping", "套件"],
+            ["爬蟲套件"],
+            ["微服务框架"],
+            ["react", "サンプルプロジェクト"],
+            ["react", "sample", "project", "japanese"],
+            ["vue", "sample", "project", "japanese", "starter"],
+        ],
+    )
+    def test_normalize_idempotent_on_iter8_inputs(
+        self, keywords: list[str]
+    ) -> None:
+        once = normalize_keywords(keywords)
+        twice = normalize_keywords(once)
+        assert once == twice
+
+
+class TestIter8MultilingualSharedContract:
+    """§7.3 — find_keyword_violations and normalize_keywords must agree on
+    which tokens iter8 rules touch."""
+
+    def test_cjk_crawler_kit_compound_flagged(self) -> None:
+        issues = find_keyword_violations(["爬蟲套件"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" in codes
+        issue = next(i for i in issues if i.code == "multilingual_canonicalization")
+        assert issue.token == "爬蟲套件"
+        assert issue.replacement == "scraping, crawler"
+
+    def test_microservice_framework_compound_flagged(self) -> None:
+        issues = find_keyword_violations(["微服务框架"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" in codes
+        issue = next(i for i in issues if i.code == "multilingual_canonicalization")
+        assert issue.token == "微服务框架"
+        assert issue.replacement == "microservice, framework"
+
+    def test_sample_project_japanese_compound_flagged(self) -> None:
+        issues = find_keyword_violations(["サンプルプロジェクト"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" in codes
+        issue = next(
+            i
+            for i in issues
+            if i.code == "multilingual_canonicalization"
+            and i.token == "サンプルプロジェクト"
+        )
+        assert issue.replacement == "sample"
+
+    def test_scraping_kit_bag_rule_flagged(self) -> None:
+        issues = find_keyword_violations(["scraping", "套件"])
+        rewrite_issues = [
+            i
+            for i in issues
+            if i.code == "multilingual_canonicalization" and i.token == "套件"
+        ]
+        assert len(rewrite_issues) == 1
+        assert rewrite_issues[0].replacement == "crawler"
+
+    def test_trio_bag_rule_flags_project_and_japanese(self) -> None:
+        issues = find_keyword_violations(
+            ["react", "sample", "project", "japanese"]
+        )
+        drop_tokens = {
+            i.token for i in issues if i.code == "multilingual_context_drop"
+        }
+        assert drop_tokens == {"project", "japanese"}
+
+    def test_trio_bag_rule_with_cjk_compound_still_flags(self) -> None:
+        # Mixed input: 'サンプルプロジェクト' expands to 'sample'; combined with
+        # explicit 'project' and 'japanese' the trio still triggers and the
+        # contract must report it (otherwise normalize / violations diverge).
+        issues = find_keyword_violations(
+            ["サンプルプロジェクト", "project", "japanese"]
+        )
+        drop_tokens = {
+            i.token for i in issues if i.code == "multilingual_context_drop"
+        }
+        assert drop_tokens == {"project", "japanese"}
+
+    def test_no_false_positive_on_kit_alone(self) -> None:
+        issues = find_keyword_violations(["套件"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" not in codes
+        assert "multilingual_context_drop" not in codes
+
+    def test_no_false_positive_on_project_alone(self) -> None:
+        issues = find_keyword_violations(["project"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" not in codes
+        assert "multilingual_context_drop" not in codes
+
+    def test_no_false_positive_on_japanese_alone(self) -> None:
+        issues = find_keyword_violations(["japanese"])
+        codes = [i.code for i in issues]
+        assert "multilingual_canonicalization" not in codes
+        assert "multilingual_context_drop" not in codes
+
+    def test_compound_rewrite_set_consistent_with_normalize(self) -> None:
+        # Spec §7.3: violations contract MUST stay aligned with the actual
+        # rewrites normalize_keywords applies — pinned across all three CJK
+        # compounds.
+        from gh_search.normalizers.keyword_rules import _CJK_COMPOUND_REWRITES
+
+        for source, expansion in _CJK_COMPOUND_REWRITES.items():
+            normalized = normalize_keywords([source])
+            assert normalized == list(expansion), (
+                f"normalize_keywords({source!r}) -> {normalized}, "
+                f"expected {list(expansion)}"
+            )
+            issues = find_keyword_violations([source])
+            flagged = [
+                i
+                for i in issues
+                if i.code == "multilingual_canonicalization" and i.token == source
+            ]
+            assert flagged, (
+                f"find_keyword_violations did not flag CJK compound {source!r}"
+            )
+
+    def test_q027_pipeline_matches_violation_flag(self) -> None:
+        # End-to-end shared-contract for q027 GPT/CLA shape.
+        raw = ["scraping", "套件"]
+        normalized = normalize_keywords(raw)
+        flagged = {
+            i.token
+            for i in find_keyword_violations(raw)
+            if i.code == "multilingual_canonicalization"
+        }
+        assert normalized == ["scraping", "crawler"]
+        assert "套件" in flagged
+
+    def test_q029_dsk_pipeline_matches_violation_flag(self) -> None:
+        # End-to-end shared-contract for q029 DSK shape.
+        raw = ["react", "sample", "project", "japanese"]
+        normalized = normalize_keywords(raw)
+        flagged = {
+            i.token
+            for i in find_keyword_violations(raw)
+            if i.code == "multilingual_context_drop"
+        }
+        assert normalized == ["react", "sample"]
+        assert flagged == {"project", "japanese"}

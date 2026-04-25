@@ -1,6 +1,8 @@
 """Task 3.6 RED: validate_query tool (TOOLS.md §3 validate_query)."""
 from __future__ import annotations
 
+import pytest
+
 from gh_search.schemas import (
     Control,
     Execution,
@@ -120,3 +122,66 @@ def test_preserves_other_state_fields():
     assert new_state.run_id == state.run_id
     assert new_state.user_query == state.user_query
     assert new_state.intention_judge == state.intention_judge
+
+
+# ---------------------------------------------------------------------------
+# Iter8 multilingual canonicalization integration
+# (ITER8_MULTILINGUAL_CANONICALIZATION_SPEC §7.2)
+# ---------------------------------------------------------------------------
+
+
+def _sq_with_keywords(keywords: list[str], language: str | None = None) -> StructuredQuery:
+    return StructuredQuery.model_validate(
+        {
+            "keywords": keywords,
+            "language": language,
+            "created_after": None,
+            "created_before": None,
+            "min_stars": None,
+            "max_stars": None,
+            "sort": None,
+            "order": None,
+            "limit": 10,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "qid,raw_keywords,language,expected_keywords",
+    [
+        # q027 GPT/CLA shape: parser emits scraping + 套件
+        ("q027_pair", ["scraping", "套件"], None, ["scraping", "crawler"]),
+        # q027 DSK shape: parser emits the joined CJK compound
+        ("q027_compound", ["爬蟲套件"], None, ["scraping", "crawler"]),
+        # q028 GPT shape: simplified Chinese compound
+        ("q028", ["微服务框架"], "Go", ["microservice", "framework"]),
+        # q029 GPT shape: Japanese compound + topic token
+        ("q029_compound", ["react", "サンプルプロジェクト"], None, ["react", "sample"]),
+        # q029 DSK shape: trio of canonical English tokens
+        (
+            "q029_trio",
+            ["react", "sample", "project", "japanese"],
+            None,
+            ["react", "sample"],
+        ),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter8_multilingual_canonicalization_through_validate_query(
+    qid: str,
+    raw_keywords: list[str],
+    language: str | None,
+    expected_keywords: list[str],
+) -> None:
+    sq = _sq_with_keywords(raw_keywords, language=language)
+    state = _base_state(structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert list(new_state.structured_query.keywords) == expected_keywords, (
+        f"{qid}: validate_query did not apply iter8 canonicalization"
+    )
+    assert new_state.validation.is_valid is True, (
+        f"{qid}: post-canonicalization keywords should be semantically valid"
+    )
