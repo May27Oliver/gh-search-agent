@@ -52,9 +52,10 @@ _PLURAL_MAP: Mapping[str, str] = MappingProxyType(
         "examples": "example",
         "utilities": "utility",
         # Iter4 (ITER4_PHRASE_POLICY_SPEC §7.3): added to support the q004
-        # phrase-only blocker. templates/projects/implementations are
-        # intentionally NOT added — those cases are parser-noise (decoration
-        # keywords GT does not carry) and belong to iter5 parser prompt work.
+        # phrase-only blocker. `projects` / `implementations` are NOT here —
+        # iter7 handles them as decoration drops via _DECORATION_STOPWORDS,
+        # not as plural rewrites. `templates` -> `template` plural drift is
+        # still deferred (ITER7 §2.3).
         "tools": "tool",
     }
 )
@@ -136,6 +137,19 @@ _MODIFIER_STOPWORDS: frozenset[str] = frozenset(
 # to re-filter on every call (ITER4_PHRASE_POLICY_SPEC §3.4).
 _MULTI_WORD_STOPWORDS: frozenset[str] = frozenset(
     s for s in _MODIFIER_STOPWORDS if " " in s
+)
+
+# Decoration stopwords (ITER7_DECORATION_CLEANUP_SPEC §3.1) — single-token
+# parser noise that does not carry topic semantics. Dropped at Stage 3 of
+# normalize_keywords; reported by find_keyword_violations under the distinct
+# `decoration_stopword` code so DEC-bucket telemetry stays separable from
+# intent-modifier drops. Kept narrow on purpose: `project`/`japanese`/
+# `templates` are deferred per §3.2 / §3.3 / §2.3.
+_DECORATION_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "implementations",
+        "projects",
+    }
 )
 
 # Technical phrases that must stay as a single keyword if present or be
@@ -259,11 +273,16 @@ def normalize_keywords(
             continue
         canonical.append(token)
 
-    # Stage 3: drop single-word modifier stopwords and language-leak tokens.
+    # Stage 3: drop single-word modifier stopwords, decoration stopwords, and
+    # language-leak tokens. Modifier and decoration sets stay separate so the
+    # find_keyword_violations trace can distinguish DEC-bucket drops from
+    # intent-modifier drops (ITER7_DECORATION_CLEANUP_SPEC §3.1).
     language_canonical = language.strip() if isinstance(language, str) else None
     filtered: list[str] = []
     for token in canonical:
         if token in _MODIFIER_STOPWORDS:
+            continue
+        if token in _DECORATION_STOPWORDS:
             continue
         if language_canonical and _is_language_leak(token, language_canonical):
             continue
@@ -351,6 +370,16 @@ def find_keyword_violations(
                 ValidationIssue(
                     code="modifier_stopword",
                     message=f"modifier stopword '{stripped}' should not be a keyword",
+                    field="keywords",
+                    token=stripped,
+                )
+            )
+
+        if stripped in _DECORATION_STOPWORDS:
+            issues.append(
+                ValidationIssue(
+                    code="decoration_stopword",
+                    message=f"decoration token '{stripped}' should not be a keyword",
                     field="keywords",
                     token=stripped,
                 )

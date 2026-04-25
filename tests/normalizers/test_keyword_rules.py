@@ -573,3 +573,101 @@ class TestIter4FollowupStage35Immutability:
         output = _drop_multi_word_stopwords(input_list)
         assert output == ["scraping"]
         assert input_list == snapshot, "Stage 3.5 must not mutate its input list"
+
+
+# ---------------------------------------------------------------------------
+# Iter7 — English decoration token cleanup
+# (ITER7_DECORATION_CLEANUP_SPEC §3.1, §7.1, §7.3)
+# ---------------------------------------------------------------------------
+
+
+class TestIter7DecorationCleanup:
+    """§7.1 — single-token decoration stopwords drop at Stage 3."""
+
+    def test_implementations_dropped_q007(self) -> None:
+        # q007 GPT/CLA/DSK iter6 blocker: parser emits decoration tail.
+        assert normalize_keywords(["graphql", "server", "implementations"]) == [
+            "graphql",
+            "server",
+        ]
+
+    def test_projects_dropped_q018_dsk(self) -> None:
+        # q018 DSK iter6 blocker.
+        assert normalize_keywords(["spring boot", "starter", "projects"]) == [
+            "spring boot",
+            "starter",
+        ]
+
+    def test_decoration_drop_is_case_insensitive(self) -> None:
+        assert normalize_keywords(["GraphQL", "Server", "IMPLEMENTATIONS"]) == [
+            "graphql",
+            "server",
+        ]
+
+    def test_project_singular_kept_locked_out_of_iter7(self) -> None:
+        # §3.2: 'project' deferred to follow-up; must NOT be dropped by iter7.
+        assert normalize_keywords(["project"]) == ["project"]
+
+    def test_project_management_phrase_kept_no_substring_match(self) -> None:
+        # Stage 0 splits 'project management' → ['project', 'management'];
+        # neither part is in _DECORATION_STOPWORDS, so both survive.
+        out = normalize_keywords(["project management"])
+        assert "project" in out and "management" in out
+
+    def test_sample_unaffected(self) -> None:
+        # §2.3: 'sample' (q029) is not in iter7 scope.
+        assert normalize_keywords(["sample"]) == ["sample"]
+
+    def test_template_unaffected_plural_drift_deferred(self) -> None:
+        # §2.3: 'templates -> template' plural drift deferred; singular passes.
+        assert normalize_keywords(["template"]) == ["template"]
+
+    def test_japanese_unaffected_deferred_to_iter8(self) -> None:
+        # §3.3: 'japanese' explicitly deferred; iter7 must not drop it.
+        assert normalize_keywords(["japanese"]) == ["japanese"]
+
+
+class TestIter7DecorationSharedContract:
+    """§7.3 — find_keyword_violations and normalize_keywords must share the
+    same decoration stopword set so the audit trail and the actual drop never
+    diverge (iter6 evidence-dict / regex divergence bug)."""
+
+    def test_decoration_set_consistent_each_token(self) -> None:
+        from gh_search.normalizers.keyword_rules import _DECORATION_STOPWORDS
+
+        for token in _DECORATION_STOPWORDS:
+            # normalize drops it.
+            assert normalize_keywords([token]) == [], (
+                f"normalize_keywords kept decoration token '{token}'"
+            )
+            # find_keyword_violations flags it under the decoration code.
+            issues = find_keyword_violations([token])
+            codes = [i.code for i in issues]
+            assert "decoration_stopword" in codes, (
+                f"find_keyword_violations did not flag decoration token "
+                f"'{token}': {codes}"
+            )
+            issue = next(i for i in issues if i.code == "decoration_stopword")
+            assert issue.token == token
+
+    def test_q007_pipeline_drop_matches_violation_flag(self) -> None:
+        raw = ["graphql", "server", "implementations"]
+        normalized = normalize_keywords(raw)
+        flagged = {
+            i.token
+            for i in find_keyword_violations(raw)
+            if i.code == "decoration_stopword"
+        }
+        assert "implementations" not in normalized
+        assert flagged == {"implementations"}
+
+    def test_q018_dsk_pipeline_drop_matches_violation_flag(self) -> None:
+        raw = ["spring boot", "starter", "projects"]
+        normalized = normalize_keywords(raw)
+        flagged = {
+            i.token
+            for i in find_keyword_violations(raw)
+            if i.code == "decoration_stopword"
+        }
+        assert "projects" not in normalized
+        assert flagged == {"projects"}
