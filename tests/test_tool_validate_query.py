@@ -600,3 +600,187 @@ def test_iter10_trending_alone_does_not_inject_min_stars() -> None:
     assert new_state.structured_query is not None
     assert new_state.structured_query.min_stars is None
     assert new_state.structured_query.max_stars is None
+
+
+# ---------------------------------------------------------------------------
+# Iter11 ranking intent integration
+# (ITER11_SORT_DEFAULTS_SPEC §7.2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "qid,user_query",
+    [
+        # §6.1 DSK primary targets — all carry ranking intent in raw query
+        (
+            "q013_dsk",
+            "trending rust projects from last year with over 500 stars but under 10k",
+        ),
+        (
+            "q015_dsk",
+            "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+        ),
+        (
+            "q026_dsk",
+            "rect native ui kit     with    lots     of stars",
+        ),
+        (
+            "q027_dsk",
+            "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+        ),
+        # §6.2 bonus — q020 GPT
+        (
+            "q020_gpt_bonus",
+            "popular stuff on github",
+        ),
+        # §6.3 guard — currently-correct cases must remain stars desc
+        (
+            "q025_top_n",
+            "gimme top10 go repoz created aftr 2022!!!",
+        ),
+        (
+            "q028_cjk_compact",
+            "推荐几个2023年以后创建的golang微服务框架，按star排序",
+        ),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter11_ranking_intent_through_validate_query(
+    qid: str, user_query: str
+) -> None:
+    # Raw parser output dropped sort/order — iter11 must fill (stars, desc).
+    sq = _sq_with_stars(min_stars=None, max_stars=None, sort=None, order=None)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.sort is not None, f"{qid}: sort missing"
+    assert new_state.structured_query.sort.value == "stars", (
+        f"{qid}: expected sort=stars"
+    )
+    assert new_state.structured_query.order is not None, f"{qid}: order missing"
+    assert new_state.structured_query.order.value == "desc", (
+        f"{qid}: expected order=desc"
+    )
+
+
+def test_iter11_idempotent_when_parser_already_correct() -> None:
+    # Parser already gave stars/desc; ranking query reaffirms — must not flip.
+    user_query = "popular TypeScript ORM libraries with more than 2k stars"
+    sq = _sq_with_stars(min_stars=2001, max_stars=None, sort="stars", order="desc")
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.sort is not None
+    assert new_state.structured_query.sort.value == "stars"
+    assert new_state.structured_query.order is not None
+    assert new_state.structured_query.order.value == "desc"
+
+
+# ---------------------------------------------------------------------------
+# Iter11 §7.3 guard: sort-only scope — other facets must be untouched
+# ---------------------------------------------------------------------------
+
+
+def test_iter11_does_not_mutate_keywords() -> None:
+    user_query = "popular TypeScript ORM libraries"
+    sq = _sq_with_stars(
+        min_stars=None,
+        max_stars=None,
+        keywords=["orm", "library"],
+        language="TypeScript",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert list(new_state.structured_query.keywords) == ["orm", "library"]
+
+
+def test_iter11_does_not_mutate_language() -> None:
+    user_query = "popular TypeScript ORM libraries"
+    sq = _sq_with_stars(
+        min_stars=None,
+        max_stars=None,
+        keywords=["orm"],
+        language="TypeScript",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.language == "TypeScript"
+
+
+def test_iter11_does_not_mutate_numeric_bounds() -> None:
+    # Ranking phrase + explicit stars threshold — iter11 must not touch numerics
+    # (those are iter10's job; §3.2).
+    user_query = "popular TypeScript ORM libraries with more than 2k stars"
+    sq = _sq_with_stars(min_stars=2001, max_stars=None, sort=None, order=None)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.min_stars == 2001
+    assert new_state.structured_query.max_stars is None
+
+
+def test_iter11_no_ranking_intent_does_not_invent_sort() -> None:
+    # No ranking phrase → iter11 must not invent sort/order.
+    user_query = "vue 3 admin dashboard templates"
+    sq = _sq_with_stars(min_stars=None, max_stars=None, sort=None, order=None)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.sort is None
+    assert new_state.structured_query.order is None
+
+
+def test_iter11_does_not_overwrite_non_stars_sort() -> None:
+    # Ranking intent present, but parser chose `updated` — iter11 must NOT
+    # overwrite (§3.3 末段).
+    user_query = "popular rust projects"
+    sq = _sq_with_stars(
+        min_stars=None,
+        max_stars=None,
+        sort="updated",
+        order="desc",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.sort is not None
+    assert new_state.structured_query.sort.value == "updated"
+    assert new_state.structured_query.order is not None
+    assert new_state.structured_query.order.value == "desc"
+
+
+def test_iter11_does_not_clear_existing_sort_when_no_intent() -> None:
+    # No ranking phrase + parser chose `updated` — iter11 must not clear
+    # existing sort/order (§3.3).
+    user_query = "vue 3 admin dashboard templates"
+    sq = _sq_with_stars(
+        min_stars=None,
+        max_stars=None,
+        sort="updated",
+        order="desc",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.sort is not None
+    assert new_state.structured_query.sort.value == "updated"
+    assert new_state.structured_query.order is not None
+    assert new_state.structured_query.order.value == "desc"

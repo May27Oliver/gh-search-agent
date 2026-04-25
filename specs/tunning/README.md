@@ -47,6 +47,10 @@
   - stars / numeric evidence downstream normalization
   - `q013 CLA` / `q020 DSK` / `q026 GPT` primary targets
   - `q030` contradictory numeric-range contract preservation
+- [ITER11_SORT_DEFAULTS_SPEC.md](ITER11_SORT_DEFAULTS_SPEC.md)
+  - ranking intent -> `sort=stars`, `order=desc` downstream hardening
+  - `q013/q015/q026/q027 DSK` primary targets
+  - `q020 GPT` bonus target
 
 使用方式：
 
