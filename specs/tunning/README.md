@@ -35,6 +35,10 @@
   - decoration token cleanup downstream 化
   - `implementations` / `projects` primary targets
   - `japanese` / `templates` deferred policy
+- [ITER8_MULTILINGUAL_CANONICALIZATION_SPEC.md](ITER8_MULTILINGUAL_CANONICALIZATION_SPEC.md)
+  - CJK / Japanese keyword canonicalization downstream 化
+  - `q027` / `q028` / `q029` multilingual target pairs
+  - `project` / `japanese` contextual drop，不升成全域 stopword
 
 使用方式：
 

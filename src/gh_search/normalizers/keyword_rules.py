@@ -10,6 +10,10 @@ Governing specs:
   pre-drop), Stage 0 (whitespace split), Stage 3.5 (post-split bag-remove),
   Stage 2 (qualifier-injection guard), and the pruned named-entity phrase
   dict.
+- `ITER8_MULTILINGUAL_CANONICALIZATION_SPEC §3, §5` — Stage 1.5 single-token
+  CJK compound expansion (1 -> N) and Stage 4 bag-level multilingual
+  contextual rewrites / drops. Component morphemes (`套件`, `project`,
+  `japanese`) are NOT promoted to global aliases / stopwords (§3.2).
 
 `normalize_keywords` and `find_keyword_violations` are the only functions that
 may rewrite or flag `StructuredQuery.keywords`. They share Stage -1 / Stage 0
@@ -152,6 +156,35 @@ _DECORATION_STOPWORDS: frozenset[str] = frozenset(
     }
 )
 
+# Iter8 multilingual single-token rewrites
+# (ITER8_MULTILINGUAL_CANONICALIZATION_SPEC §3.1).
+#
+# CJK / Japanese compounds the parser may emit as one token. Each maps to a
+# tuple of canonical English tokens (1 -> N expansion). Applied at Stage 1.5,
+# after Stage 1 alias / plural canonicalization but before Stage 4 contextual
+# bag rules.
+#
+# Kept narrow on purpose: component morphemes (`套件`, `project`, `japanese`)
+# are explicitly NOT promoted to global aliases / stopwords (§3.2). Only the
+# patterns dataset evidence supports (q027 / q028 / q029) live here.
+_CJK_COMPOUND_REWRITES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "爬蟲套件": ("scraping", "crawler"),
+        "微服务框架": ("microservice", "framework"),
+        "サンプルプロジェクト": ("sample",),
+    }
+)
+
+# Iter8 contextual triggers (§3.1) — Stage 4 bag-level rules. Order-insensitive:
+# rules trigger when the full set is present in the canonical bag, regardless
+# of parser emission order. Component tokens stay topic-bearing in any other
+# context (§3.2 — narrow contextual cleanup, not global stopword promotion).
+_SCRAPING_KIT_TRIGGER: frozenset[str] = frozenset({"scraping", "套件"})
+_SAMPLE_PROJECT_JAPANESE_TRIGGER: frozenset[str] = frozenset(
+    {"sample", "project", "japanese"}
+)
+_SAMPLE_PROJECT_JAPANESE_DROP: frozenset[str] = frozenset({"project", "japanese"})
+
 # Technical phrases that must stay as a single keyword if present or be
 # re-assembled from adjacent split tokens (§4.2.1).
 #
@@ -242,19 +275,24 @@ def normalize_keywords(
     """Canonicalize a keyword list — single entry point for runtime + scorer.
 
     Pipeline (deterministic, order-independent phrase detection, idempotent),
-    per ITER4_PHRASE_POLICY_SPEC §3 + §7.1:
+    per ITER4_PHRASE_POLICY_SPEC §3 + §7.1, extended by ITER8 §3.1 / §5.3:
 
     - Stage -1: drop raw entries that exactly match a multi-word stopword
       (before Stage 0 would shred them into sub-tokens).
     - Stage 0:  split multi-word input strings on whitespace so per-token
       rules fire on every sub-token (parser may emit e.g. ['web frameworks']).
     - Stage 1:  strip / lowercase each sub-token; apply alias + plural maps.
+    - Stage 1.5: multilingual single-token rewrite (1 -> N expansion) for
+      CJK / Japanese compounds the parser emits as one token (iter8 §3.1).
     - Stage 2:  drop qualifier-shaped tokens ('foo:bar') that would otherwise
       become GitHub structural modifiers when interpolated into `q=`.
     - Stage 3:  drop single-word modifier stopwords + language-leak tokens
       (when the `language` facet is set).
     - Stage 3.5: drop multi-word stopwords whose parts all landed in the bag
       after Stage 0 split (handles e.g. 'open source logistics').
+    - Stage 4:  multilingual contextual bag rules (iter8 §3.1) — narrow
+      contextual rewrites / drops that only fire when the full trigger set
+      is present (`scraping`+`套件`; `sample`+`project`+`japanese`).
     - Stage 5:  greedy-merge adjacent tokens that form a technical phrase.
       Output places merged phrases first, then remaining tokens in their
       input order (see `_merge_phrases`).
@@ -262,8 +300,8 @@ def normalize_keywords(
     """
     _, sub_tokens = _tokenize(keywords)
 
-    # Stage 1 + Stage 2: per-token canonicalize; drop empties and qualifier
-    # tokens that would inject GitHub query modifiers.
+    # Stage 1 + Stage 1.5 + Stage 2: per-token canonicalize, expand CJK
+    # compounds (1 -> N), drop empties and qualifier tokens.
     canonical: list[str] = []
     for raw in sub_tokens:
         token = canonicalize_keyword_token(raw)
@@ -271,7 +309,7 @@ def normalize_keywords(
             continue
         if _QUALIFIER_TOKEN_RE.match(token):
             continue
-        canonical.append(token)
+        canonical.extend(_expand_cjk_compound(token))
 
     # Stage 3: drop single-word modifier stopwords, decoration stopwords, and
     # language-leak tokens. Modifier and decoration sets stay separate so the
@@ -290,6 +328,9 @@ def normalize_keywords(
 
     # Stage 3.5: drop multi-word stopwords whose parts all landed in the bag.
     filtered = _drop_multi_word_stopwords(filtered)
+
+    # Stage 4: iter8 multilingual contextual bag rules.
+    filtered = _apply_multilingual_context_rules(filtered)
 
     # Stage 5: greedy phrase merge.
     merged = _merge_phrases(filtered)
@@ -385,6 +426,22 @@ def find_keyword_violations(
                 )
             )
 
+        if stripped in _CJK_COMPOUND_REWRITES:
+            expansion = _CJK_COMPOUND_REWRITES[stripped]
+            replacement_str = ", ".join(expansion)
+            issues.append(
+                ValidationIssue(
+                    code="multilingual_canonicalization",
+                    message=(
+                        f"multilingual compound '{stripped}' -> "
+                        f"[{replacement_str}]"
+                    ),
+                    field="keywords",
+                    token=stripped,
+                    replacement=replacement_str,
+                )
+            )
+
         # Language-leak check is evaluated on the canonicalized form so that
         # aliases ('js' -> 'javascript') participate in leak detection.
         canonical = canonicalize_keyword_token(raw)
@@ -451,6 +508,43 @@ def find_keyword_violations(
                 )
             )
 
+    # Stage 4 violations: iter8 multilingual contextual bag rules. Operate on
+    # the bag AFTER Stage 1.5 single-token expansion so detection matches the
+    # set of tokens normalize_keywords actually sees at Stage 4 (§7.3
+    # shared-contract).
+    expanded_bag: list[str] = []
+    for t in canonical_tokens:
+        expanded_bag.extend(_expand_cjk_compound(t))
+    expanded_set = set(expanded_bag)
+
+    if _SCRAPING_KIT_TRIGGER.issubset(expanded_set):
+        issues.append(
+            ValidationIssue(
+                code="multilingual_canonicalization",
+                message=(
+                    "contextual rewrite: '套件' -> 'crawler' when "
+                    "'scraping' co-occurs"
+                ),
+                field="keywords",
+                token="套件",
+                replacement="crawler",
+            )
+        )
+
+    if _SAMPLE_PROJECT_JAPANESE_TRIGGER.issubset(expanded_set):
+        for drop_token in ("project", "japanese"):
+            issues.append(
+                ValidationIssue(
+                    code="multilingual_context_drop",
+                    message=(
+                        f"contextual drop: '{drop_token}' when "
+                        "sample+project+japanese co-occur"
+                    ),
+                    field="keywords",
+                    token=drop_token,
+                )
+            )
+
     return issues
 
 
@@ -464,6 +558,39 @@ def _is_language_leak(token: str, language_facet: str) -> bool:
     if mapped is None:
         return False
     return mapped.lower() == language_facet.lower()
+
+
+def _expand_cjk_compound(token: str) -> tuple[str, ...]:
+    """Stage 1.5 — multilingual single-token rewrite (1 -> N expansion).
+
+    Returns the expanded canonical English tokens for a CJK / Japanese
+    compound, or `(token,)` unchanged when no rewrite applies. Kept narrow:
+    only the patterns dataset evidence supports (q027 / q028 / q029) live in
+    `_CJK_COMPOUND_REWRITES`.
+    """
+    return _CJK_COMPOUND_REWRITES.get(token, (token,))
+
+
+def _apply_multilingual_context_rules(tokens: list[str]) -> list[str]:
+    """Stage 4 — bag-level multilingual contextual rewrites / drops (iter8 §3.1).
+
+    Order-insensitive: a rule fires only when its full trigger set is present
+    in the canonical token bag. Component tokens (`套件`, `project`,
+    `japanese`) survive unchanged in any other context (§3.2).
+    """
+    bag = list(tokens)
+    bag_set = set(bag)
+
+    # Rule: `scraping` + `套件` -> replace `套件` with `crawler`.
+    if _SCRAPING_KIT_TRIGGER.issubset(bag_set):
+        bag = ["crawler" if t == "套件" else t for t in bag]
+        bag_set = set(bag)
+
+    # Rule: `sample` + `project` + `japanese` -> drop `project` and `japanese`.
+    if _SAMPLE_PROJECT_JAPANESE_TRIGGER.issubset(bag_set):
+        bag = [t for t in bag if t not in _SAMPLE_PROJECT_JAPANESE_DROP]
+
+    return bag
 
 
 def _drop_multi_word_stopwords(tokens: list[str]) -> list[str]:
