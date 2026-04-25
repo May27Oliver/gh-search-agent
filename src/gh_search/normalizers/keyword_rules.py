@@ -96,12 +96,18 @@ _ALIAS_MAP: Mapping[str, str] = MappingProxyType(
 
 # Language names that must not appear in `keywords` when `language` facet is
 # set to the matching value (§6.1). Values are canonical GitHub language names.
+# Iter9 (ITER9_LANGUAGE_OVERINFERENCE_RESIDUAL_SPEC §3.1) reuses this map as
+# the read-only single source of truth for language evidence detection in
+# `validate_query`. Typo aliases `pythn` / `javscript` are dataset-anchored
+# (q023 / q024); no speculative typos beyond explicit dataset evidence.
 _LANGUAGE_TOKEN_TO_FACET: Mapping[str, str] = MappingProxyType(
     {
         "python": "Python",
         "py": "Python",
+        "pythn": "Python",
         "javascript": "JavaScript",
         "js": "JavaScript",
+        "javscript": "JavaScript",
         "typescript": "TypeScript",
         "ts": "TypeScript",
         "java": "Java",
