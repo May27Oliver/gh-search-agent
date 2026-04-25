@@ -85,7 +85,13 @@ def test_valid_query_passes_and_routes_to_compile():
 
 
 def test_invalid_query_routes_to_repair():
-    state = _base_state(structured_query=_conflicting_sq())
+    # iter10 query-driven rewrite would clear bounds without star evidence,
+    # masking the validator-level conflict. Anchor the conflict in user_query
+    # so iter10 preserves min=500 / max=100 verbatim and validator still trips.
+    state = _base_state(
+        user_query="python repos with min 500 stars but max 100 stars",
+        structured_query=_conflicting_sq(),
+    )
     new_state = validate_query(state)
 
     assert new_state.validation.is_valid is False
@@ -107,7 +113,12 @@ def test_missing_structured_query_terminates_with_validation_failed():
 
 def test_does_not_mutate_structured_query_or_execution():
     sq = _valid_sq()
-    state = _base_state(structured_query=sq)
+    # _valid_sq carries min_stars=100; anchor it so iter10 preserves it as-is
+    # and the immutability check is meaningful.
+    state = _base_state(
+        user_query="python logistics with at least 100 stars",
+        structured_query=sq,
+    )
     new_state = validate_query(state)
 
     assert new_state.structured_query == sq
@@ -116,7 +127,10 @@ def test_does_not_mutate_structured_query_or_execution():
 
 
 def test_preserves_other_state_fields():
-    state = _base_state(structured_query=_valid_sq())
+    state = _base_state(
+        user_query="python logistics with at least 100 stars",
+        structured_query=_valid_sq(),
+    )
     new_state = validate_query(state)
 
     assert new_state.run_id == state.run_id
@@ -332,3 +346,257 @@ def test_iter9_explicit_language_preserved_through_validate_query(
     assert new_state.structured_query.language == raw_language, (
         f"{qid}: language should be preserved when user_query carries an explicit anchor"
     )
+
+
+# ---------------------------------------------------------------------------
+# Iter10 numeric evidence integration
+# (ITER10_STARS_NUMERIC_SEMANTICS_SPEC §7.2)
+# ---------------------------------------------------------------------------
+
+
+def _sq_with_stars(
+    *,
+    min_stars: int | None,
+    max_stars: int | None,
+    keywords: list[str] | None = None,
+    language: str | None = None,
+    sort: str | None = None,
+    order: str | None = None,
+    limit: int = 10,
+) -> StructuredQuery:
+    return StructuredQuery.model_validate(
+        {
+            "keywords": keywords or [],
+            "language": language,
+            "created_after": None,
+            "created_before": None,
+            "min_stars": min_stars,
+            "max_stars": max_stars,
+            "sort": sort,
+            "order": order,
+            "limit": limit,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "qid,user_query,raw_min,raw_max,expected_min,expected_max",
+    [
+        # §6.1 primary targets
+        (
+            "q013_cla",
+            "trending rust projects from last year with over 500 stars but under 10k",
+            500,
+            10000,
+            501,
+            9999,
+        ),
+        (
+            "q020_dsk",
+            "popular stuff on github",
+            100,
+            None,
+            None,
+            None,
+        ),
+        (
+            "q026_gpt",
+            "rect native ui kit     with    lots     of stars",
+            1,
+            None,
+            None,
+            None,
+        ),
+        # §6.3 guard set: currently-correct cases must passthrough
+        (
+            "q011_inclusive_passthrough",
+            "python scraping libraries created after 2023 with at least 1000 stars",
+            1000,
+            None,
+            1000,
+            None,
+        ),
+        (
+            "q015_exclusive_passthrough",
+            "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+            2001,
+            None,
+            2001,
+            None,
+        ),
+        (
+            "q017_exclusive_upper_passthrough",
+            "small python utilities under 100 stars created this year",
+            None,
+            99,
+            None,
+            99,
+        ),
+        (
+            "q024_inclusive_min_passthrough",
+            "javscript chatbot libs with min 500 starz plz",
+            500,
+            None,
+            500,
+            None,
+        ),
+        (
+            "q027_cjk_exclusive_passthrough",
+            "幫我找一下熱門的 python 爬蟲套件，star 數超過 1000 的",
+            1001,
+            None,
+            1001,
+            None,
+        ),
+        # parser dropped values that query supports → query-driven rewrite must add
+        (
+            "q013_parser_dropped_both",
+            "trending rust projects from last year with over 500 stars but under 10k",
+            None,
+            None,
+            501,
+            9999,
+        ),
+        # parser used inclusive interpretation; query is exclusive → rewrite
+        (
+            "q015_inclusive_to_exclusive_rewrite",
+            "find me 20 popular TypeScript ORM libraries with more than 2k stars",
+            2000,
+            None,
+            2001,
+            None,
+        ),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter10_numeric_evidence_through_validate_query(
+    qid: str,
+    user_query: str,
+    raw_min: int | None,
+    raw_max: int | None,
+    expected_min: int | None,
+    expected_max: int | None,
+) -> None:
+    sq = _sq_with_stars(min_stars=raw_min, max_stars=raw_max)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.min_stars == expected_min, (
+        f"{qid}: min_stars mismatch"
+    )
+    assert new_state.structured_query.max_stars == expected_max, (
+        f"{qid}: max_stars mismatch"
+    )
+
+
+@pytest.mark.parametrize(
+    "qid,raw_min,raw_max",
+    [
+        ("q030_gpt_swap", 100, 500),
+        ("q030_cla_swap", 100, 500),
+        ("q030_dsk_reversed", 99, 501),
+        ("q030_parser_dropped", None, None),
+        ("q030_already_correct", 501, 99),
+    ],
+    ids=lambda v: v if isinstance(v, str) else None,
+)
+def test_iter10_q030_contradictory_range_contract(
+    qid: str, raw_min: int | None, raw_max: int | None
+) -> None:
+    user_query = "找一些 star 超過 500 但少於 100 的 rust 專案"
+    sq = _sq_with_stars(min_stars=raw_min, max_stars=raw_max, language="Rust")
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.min_stars == 501, (
+        f"{qid}: q030 contract requires min_stars=501"
+    )
+    assert new_state.structured_query.max_stars == 99, (
+        f"{qid}: q030 contract requires max_stars=99"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Iter10 §7.3 guard: numeric-only scope — non-numeric facets must be untouched
+# ---------------------------------------------------------------------------
+
+
+def test_iter10_does_not_mutate_keywords() -> None:
+    user_query = "rust projects with over 500 stars but under 10k"
+    # 'logistics' is a topical keyword the iter8 normalizer leaves alone, so
+    # any change here would have to come from iter10 numeric normalization.
+    sq = _sq_with_stars(
+        min_stars=500,
+        max_stars=10000,
+        keywords=["logistics"],
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert list(new_state.structured_query.keywords) == ["logistics"]
+
+
+def test_iter10_does_not_mutate_language() -> None:
+    user_query = "find me 20 popular TypeScript ORM libraries with more than 2k stars"
+    sq = _sq_with_stars(
+        min_stars=2000,
+        max_stars=None,
+        keywords=["orm", "library"],
+        language="TypeScript",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.language == "TypeScript"
+
+
+def test_iter10_does_not_mutate_sort_order() -> None:
+    user_query = "popular stuff on github"
+    sq = _sq_with_stars(
+        min_stars=100,
+        max_stars=None,
+        sort="stars",
+        order="desc",
+    )
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    # Iter10 must clear hallucinated min_stars …
+    assert new_state.structured_query.min_stars is None
+    # … but must not touch sort/order set by upstream.
+    assert new_state.structured_query.sort is not None
+    assert new_state.structured_query.order is not None
+
+
+def test_iter10_popular_alone_does_not_inject_min_stars() -> None:
+    user_query = "popular stuff on github"
+    sq = _sq_with_stars(min_stars=None, max_stars=None)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.min_stars is None
+    assert new_state.structured_query.max_stars is None
+
+
+def test_iter10_trending_alone_does_not_inject_min_stars() -> None:
+    user_query = "trending repos"
+    sq = _sq_with_stars(min_stars=None, max_stars=None)
+    state = _base_state(user_query=user_query, structured_query=sq)
+
+    new_state = validate_query(state)
+
+    assert new_state.structured_query is not None
+    assert new_state.structured_query.min_stars is None
+    assert new_state.structured_query.max_stars is None

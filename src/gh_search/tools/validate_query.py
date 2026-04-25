@@ -76,17 +76,31 @@ def _normalize_structured_query(
 ) -> StructuredQuery:
     normalized_keywords = normalize_keywords(list(sq.keywords), language=sq.language)
     suppressed_language = _suppress_unsupported_language(sq.language, user_query)
+    normalized_min_stars, normalized_max_stars = _normalize_star_bounds(
+        sq.min_stars, sq.max_stars, user_query
+    )
 
     keywords_changed = normalized_keywords != list(sq.keywords)
     language_changed = suppressed_language != sq.language
-    if not keywords_changed and not language_changed:
+    min_stars_changed = normalized_min_stars != sq.min_stars
+    max_stars_changed = normalized_max_stars != sq.max_stars
+    if not (
+        keywords_changed
+        or language_changed
+        or min_stars_changed
+        or max_stars_changed
+    ):
         return sq
 
-    update: dict[str, object] = {}
+    update: dict[str, object | None] = {}
     if keywords_changed:
         update["keywords"] = normalized_keywords
     if language_changed:
         update["language"] = suppressed_language
+    if min_stars_changed:
+        update["min_stars"] = normalized_min_stars
+    if max_stars_changed:
+        update["max_stars"] = normalized_max_stars
     return sq.model_copy(update=update)
 
 
@@ -140,3 +154,70 @@ def _suppress_unsupported_language(
         if re.search(pattern, user_query, re.IGNORECASE):
             return language
     return None
+
+
+# ---------------------------------------------------------------------------
+# Iter10 numeric evidence (§3) — query-driven star-bound rewrite.
+# ---------------------------------------------------------------------------
+
+# Order: longer/more-specific alternatives first within each group so regex
+# alternation picks the correct comparator. ASCII tokens use word boundaries
+# to prevent matches inside larger words ("minute", "starwars"); CJK
+# comparators rely on natural script boundaries.
+_COMPARATOR_NUM = re.compile(
+    r"""
+    (?:
+        (?P<excl_lower>\bmore\s+than\b|\bover\b|超過|>(?!=))
+      | (?P<excl_upper>\bless\s+than\b|\bunder\b|少於|<(?!=))
+      | (?P<incl_lower>\bat\s+least\b|\bminimum\b|\bmin\b|>=)
+      | (?P<incl_upper>\bat\s+most\b|\bmaximum\b|\bmax\b|<=)
+    )
+    \s*
+    (?P<num>\d+)
+    (?P<suffix>[kK])?
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+_STARS_ANCHOR = re.compile(r"star|星", re.IGNORECASE)
+
+
+def _normalize_star_bounds(
+    min_stars: int | None,
+    max_stars: int | None,
+    user_query: str,
+) -> tuple[int | None, int | None]:
+    """Recompute (min_stars, max_stars) from explicit user_query evidence.
+
+    Implements ITER10 §3 query-driven rewrite:
+      - require a stars anchor (`star*` / `星`) in the query; without it,
+        any incoming numeric bound is cleared (vague-popularity rule §3.1)
+      - within an anchored query, comparator + number drives the bound:
+          exclusive: `over N` / `more than N` / `超過 N` / `> N`  → N + 1
+                     `under N` / `less than N` / `少於 N` / `< N` → N − 1
+          inclusive: `min N` / `at least N` / `>= N` / `minimum N` → N
+                     `max N` / `at most N` / `<= N` / `maximum N` → N
+      - numeric token: plain integer, optional `k` suffix (× 1000)
+      - contradictory ranges are preserved verbatim (§3.3); logical
+        consistency is not enforced
+
+    Incoming `min_stars` / `max_stars` are intentionally ignored — the
+    function is a deterministic recomputation, not a guarded patch.
+    """
+    if not _STARS_ANCHOR.search(user_query):
+        return (None, None)
+
+    new_min: int | None = None
+    new_max: int | None = None
+    for match in _COMPARATOR_NUM.finditer(user_query):
+        num = int(match.group("num"))
+        if match.group("suffix"):
+            num *= 1000
+        if match.group("excl_lower") is not None:
+            new_min = num + 1
+        elif match.group("excl_upper") is not None:
+            new_max = num - 1
+        elif match.group("incl_lower") is not None:
+            new_min = num
+        elif match.group("incl_upper") is not None:
+            new_max = num
+    return (new_min, new_max)

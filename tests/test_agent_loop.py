@@ -58,7 +58,7 @@ def test_supported_normal_query_runs_to_success():
     )
 
     state = run_agent_loop(
-        user_query="python logistics 100+ stars",
+        user_query="python logistics with at least 100 stars",
         run_id="r1",
         llm=llm,
         github=github,
@@ -146,7 +146,7 @@ def test_invalid_parse_triggers_repair_and_recovers():
     )
 
     state = run_agent_loop(
-        user_query="python logistics 100+ stars",
+        user_query="python logistics with at least 100 stars",
         run_id="r5",
         llm=llm,
         github=github,
@@ -212,7 +212,7 @@ def test_turn_logs_include_raw_model_output_for_llm_tools(tmp_path):
     logger = SessionLogger(session_id="sess_raw", log_root=tmp_path)
 
     run_agent_loop(
-        user_query="python logistics 100+ stars",
+        user_query="python logistics with at least 100 stars",
         run_id="r_raw",
         llm=llm,
         github=_fake_github(
@@ -283,7 +283,7 @@ def test_turn_logger_appends_one_line_per_turn(tmp_path):
     logger = SessionLogger(session_id="sess_1", log_root=tmp_path)
 
     state = run_agent_loop(
-        user_query="python logistics 100+ stars",
+        user_query="python logistics with at least 100 stars",
         run_id="r8",
         llm=llm,
         github=_fake_github(

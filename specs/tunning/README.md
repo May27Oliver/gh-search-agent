@@ -43,6 +43,10 @@
   - residual language over-inference downstream suppression
   - `q001 GPT` / `q029 GPT` primary targets
   - `q009 GPT` / `q029 CLA` contract-only language cleanup
+- [ITER10_STARS_NUMERIC_SEMANTICS_SPEC.md](ITER10_STARS_NUMERIC_SEMANTICS_SPEC.md)
+  - stars / numeric evidence downstream normalization
+  - `q013 CLA` / `q020 DSK` / `q026 GPT` primary targets
+  - `q030` contradictory numeric-range contract preservation
 
 使用方式：
 
