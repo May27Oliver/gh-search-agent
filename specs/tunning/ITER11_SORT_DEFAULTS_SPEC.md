@@ -361,6 +361,39 @@ gh-search smoke --model DeepSeek-R1     --dataset datasets/eval_dataset_reviewed
 
 且 **不是 iter11 patch 造成的新 sort regression**，可判為 **實質通過**。
 
+### 8.3 Iter11 實際結果（2026-04-25）
+
+iter11 smoke 結果：
+
+- GPT：`27/30 -> 28/30`
+- CLA：`29/30 -> 29/30`
+- DSK：`24/30 -> 28/30`
+
+對照 §8 通過標準逐項驗收：
+
+| 驗收條件 | 結果 | 備註 |
+|---|---|---|
+| §6.1 primary 至少回收 2 題 | ✅ | DSK `q013/q015/q026/q027` **4/4 全翻正** |
+| §6.2 bonus | ✅ | `q020 GPT` 由 `sort=None, order=None` 補回 `stars desc` |
+| §6.3 guard set 無新 sort regression | ✅ | `q001/q013/q015/q018/q020/q025/q028` 皆維持正確 |
+| `pytest -q` 全綠 | 參見 implementation run | 本次回填以 smoke / artifact 驗收為主，未重跑測試 |
+| DSK headline ≥ `26/30` | ✅ | DSK `28/30` |
+
+因此 iter11 符合 **§8.1 完整達標**，不觸發 rollback。
+
+### 8.4 因果歸因
+
+iter11 可直接歸因的 deterministic 增益為：
+
+- `q013 DSK`：`sort/order=None -> stars/desc`
+- `q015 DSK`：`sort/order=None -> stars/desc`
+- `q026 DSK`：`sort/order=None -> stars/desc`
+- `q027 DSK`：`sort/order=None -> stars/desc`
+- `q020 GPT`：`sort/order=None -> stars/desc`（bonus）
+
+本輪沒有觀察到新的 sort regression，也沒有 evidence 顯示 headline 提升來自
+prompt-level 變更或其他非本輪 scope 的 patch。
+
 ## 9. 驗證不過時的調整順序
 
 若驗證未過，依下列順序收斂：
@@ -387,12 +420,24 @@ gh-search smoke --model DeepSeek-R1     --dataset datasets/eval_dataset_reviewed
 
 ## 11. Handoff
 
-iter11 後仍可能殘留的桶：
+iter11 shipped 後仍殘留 **5 個 fail / 3 個桶**：
+
+| qid | model | 殘留症狀 | 桶 |
+|---|---|---|---|
+| q009 | GPT | 缺 `vue 3` | topic retention residual |
+| q018 | GPT | 缺 `spring boot`、`created_before=null` | parser drift / date residual |
+| q029 | CLA | 缺 `react` | topic retention residual |
+| q009 | DSK | `templates -> template` 未收斂 | plural drift |
+| q029 | DSK | 多 `project` | multilingual decoration residual |
+
+iter11 沒有必要再延伸 stars/sort scope；剩餘問題已不屬本輪責任。
+
+後續仍可能處理的桶：
 
 - `q009 DSK`
   - plural drift follow-up
 - `q029 DSK`
-  - topic retention residual
+  - multilingual decoration residual
 - `q018 GPT`
   - parser drift / date residual
 - `q029 CLA`
@@ -400,5 +445,6 @@ iter11 後仍可能殘留的桶：
 
 若 iter11 shipped，下一輪優先順序建議為：
 
-1. plural drift 小修
-2. parser-retention 尾巴（`q018 GPT` / `q029 CLA` / `q029 DSK`）
+1. plural / decoration 小修（`q009 DSK`, `q029 DSK`）
+2. topic-retention 尾巴（`q009 GPT`, `q029 CLA`）
+3. parser/date residual（`q018 GPT`）
