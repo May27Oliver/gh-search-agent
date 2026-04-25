@@ -1,12 +1,15 @@
 """validate_query tool (TOOLS.md §3, §9, KEYWORD_TUNING_SPEC §8).
 
 Runs the shared keyword canonicalization pipeline (`normalize_keywords`)
-before semantic validation so the rest of the loop, the repair step, the
-scorer, and the artifact trace all see the same post-normalization keywords.
+and the language-evidence contraction (`normalize_language_facet`,
+ITER6_LANGUAGE_OVERINFERENCE_SPEC §6.1) before semantic validation, so the
+loop, repair step, scorer, and artifact trace all see the same
+post-normalization snapshot.
 """
 from __future__ import annotations
 
 from gh_search.normalizers import normalize_keywords
+from gh_search.normalizers.language_rules import normalize_language_facet
 from gh_search.schemas import (
     Control,
     SharedAgentState,
@@ -39,7 +42,7 @@ def validate_query(state: SharedAgentState) -> SharedAgentState:
         )
         return state.model_copy(update={"validation": validation, "control": control})
 
-    normalized_sq = _normalize_structured_query(state.structured_query)
+    normalized_sq = _normalize_structured_query(state.structured_query, state.user_query)
     validation = validate_structured_query(normalized_sq)
     if validation.is_valid:
         control = Control(
@@ -63,8 +66,21 @@ def validate_query(state: SharedAgentState) -> SharedAgentState:
     )
 
 
-def _normalize_structured_query(sq: StructuredQuery) -> StructuredQuery:
-    normalized = normalize_keywords(list(sq.keywords), language=sq.language)
-    if normalized == list(sq.keywords):
+def _normalize_structured_query(sq: StructuredQuery, user_query: str) -> StructuredQuery:
+    normalized_keywords = normalize_keywords(list(sq.keywords), language=sq.language)
+    normalized_language, _language_issues = normalize_language_facet(
+        raw_language=sq.language,
+        user_query=user_query,
+    )
+
+    keywords_changed = normalized_keywords != list(sq.keywords)
+    language_changed = normalized_language != sq.language
+    if not keywords_changed and not language_changed:
         return sq
-    return sq.model_copy(update={"keywords": normalized})
+
+    update: dict[str, object] = {}
+    if keywords_changed:
+        update["keywords"] = normalized_keywords
+    if language_changed:
+        update["language"] = normalized_language
+    return sq.model_copy(update=update)
