@@ -16,6 +16,7 @@ _STRICT = ConfigDict(extra="forbid", frozen=True)
 
 
 class IntentionJudge(BaseModel):
+    """Intent gate output persisted between tools."""
     model_config = _STRICT
 
     intent_status: IntentStatus = Field(...)
@@ -24,6 +25,7 @@ class IntentionJudge(BaseModel):
 
 
 class Validation(BaseModel):
+    """Semantic validation result for the current structured query."""
     model_config = _STRICT
 
     is_valid: bool = Field(...)
@@ -32,6 +34,7 @@ class Validation(BaseModel):
 
 
 class Execution(BaseModel):
+    """Execution metadata for the GitHub API step."""
     model_config = _STRICT
 
     status: ExecutionStatus = Field(...)
@@ -40,6 +43,7 @@ class Execution(BaseModel):
 
 
 class Control(BaseModel):
+    """Loop-control envelope that tells the scheduler what to do next."""
     model_config = _STRICT
 
     next_tool: ToolName | None = Field(...)

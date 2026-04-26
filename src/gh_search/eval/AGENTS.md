@@ -13,11 +13,18 @@
 `run_smoke_eval(dataset_path, llm, github, ...)` 會做這些事：
 
 1. 從datasets讀 dataset（JSON 檔）。
+   如果 dataset 有 `metadata.reference_date`，runner 會把它當作 relative-date 題目的標註基準往下傳。
 2. 逐題跑**一次完整的 agent loop**，每題都有獨立的 session 目錄。跑的過程中會實際呼叫 LLM（叫 parse、叫 repair…）、實際打 GitHub API、實際把 log / artifact 寫到磁碟。
 3. 每題跑完後，從 agent 的 `final_state` 抽出「實際的 outcome、實際的 terminate_reason、實際產生的 `StructuredQuery`」，連同「這題的標準答案」一起交給 scorer 判分。
 4. 把每題的判分結果寫進 `per_item_results.jsonl`，全部跑完再寫一份 `model_summary.json`，回傳 `SmokeSummary`（正確率、對幾題、每種 outcome 各出現幾次）。
 
 所以「叫 LLM、打網路、讀寫檔案」這些事**都發生在 runner 這一層**。
+
+如果你要真的打開 code 講給別人聽，建議閱讀順序是：
+
+1. 先看 `run_smoke_eval()`，理解它怎麼把 dataset item 變成一次完整 session。
+2. 再看 `_write_session_finalization()`，因為它最能說明「eval 跑完之後，會落哪些檔案」。
+3. 最後看 `_per_item_entry()`，這會回答「外層 summary JSONL 到底收了哪些欄位」。
 
 ### 2. [`scorer.py`](./scorer.py) — 改考卷
 

@@ -14,6 +14,7 @@ _STRICT = ConfigDict(extra="forbid", frozen=True)
 
 
 class RunLog(BaseModel):
+    """Session-level metadata written once per completed run."""
     model_config = _STRICT
 
     session_id: str = Field(...)
@@ -44,6 +45,7 @@ class KeywordNormalizationTrace(BaseModel):
 
 
 class TurnLog(BaseModel):
+    """One row in `turns.jsonl`, capturing a single tool invocation."""
     model_config = _STRICT
 
     session_id: str = Field(...)
@@ -66,6 +68,7 @@ class TurnLog(BaseModel):
 
 
 class FinalState(BaseModel):
+    """Terminal snapshot of the agent state written at the end of a run."""
     model_config = _STRICT
 
     session_id: str = Field(...)

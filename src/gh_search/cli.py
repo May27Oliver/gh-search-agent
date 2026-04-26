@@ -38,8 +38,11 @@ from gh_search.schemas import (
     TerminateReason,
 )
 
+QUERY_DEFAULT_MODEL = "gpt-4.1-mini"
+
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the top-level CLI parser and its three subcommands."""
     parser = argparse.ArgumentParser(
         prog="gh-search",
         description=(
@@ -55,7 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = sub.add_parser("query", help="Run a single natural-language query")
     q.add_argument("text", help="The natural-language query, wrapped in quotes")
     q.add_argument("--max-turns", type=int, default=None, help="Override max agent turns")
-    q.add_argument("--model", default=None, help="Override parser model (default gpt-4.1-mini)")
+    q.add_argument(
+        "--model",
+        default=QUERY_DEFAULT_MODEL,
+        help=f"Parser model to use (default: {QUERY_DEFAULT_MODEL})",
+    )
 
     sub.add_parser("check", help="Validate .env config and exit")
 
@@ -88,16 +95,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_query(args: argparse.Namespace) -> int:
+    """Run one end-to-end agent session for a user query."""
     cfg = load_config()
     cfg.require(["github_token"])
 
     session_id = f"sess_{uuid.uuid4().hex[:12]}"
     run_id = f"run_{uuid.uuid4().hex[:12]}"
-    model = args.model or cfg.model
+    model = args.model
     max_turns = args.max_turns or cfg.max_turns
 
     binding = _resolve_llm(cfg, model)
-    prompt_version = f"core-v1 + appendix-{binding.model_name}-v1"
+    prompt_version = f"core + appendix-{binding.model_name}"
     llm = binding.call
     github = GitHubClient(token=cfg.github_token)
     logger = SessionLogger(session_id=session_id, log_root=cfg.log_root)
@@ -169,6 +177,7 @@ def _cmd_query(args: argparse.Namespace) -> int:
 
 
 def _cmd_smoke(args: argparse.Namespace) -> int:
+    """Run the eval runner against the smoke dataset for one model."""
     from pathlib import Path
 
     from gh_search.eval.runner import run_smoke_eval
@@ -176,10 +185,9 @@ def _cmd_smoke(args: argparse.Namespace) -> int:
     cfg = load_config()
     cfg.require(["github_token"])
 
-    eval_run_id = args.eval_run_id or f"smoke_{uuid.uuid4().hex[:8]}"
-
     binding = _resolve_llm(cfg, args.model or cfg.model)
-    prompt_version = f"core-v1 + appendix-{binding.model_name}-v1"
+    eval_run_id = args.eval_run_id or _default_eval_run_id(binding.model_name)
+    prompt_version = f"core + appendix-{binding.model_name}"
     github = GitHubClient(token=cfg.github_token)
 
     summary = run_smoke_eval(
@@ -205,23 +213,15 @@ def _cmd_smoke(args: argparse.Namespace) -> int:
 
 
 def _cmd_check(_: argparse.Namespace) -> int:
+    """Validate the active config for the default provider and exit."""
     cfg = load_config()
-    # Only require the provider key that matches the default model; teams that
-    # haven't onboarded every provider yet can still run `check` for the
-    # provider they do use.
     try:
         canonical = canonical_model_name(cfg.model)
-        provider = cfg.provider_override or provider_for(canonical)
+        provider = provider_for(canonical)
     except UnknownModelError as exc:
         raise ConfigError(str(exc)) from exc
 
-    required_key = _required_key_for(provider)
-    if required_key is None:
-        raise ConfigError(
-            f"unknown provider: {provider!r}. "
-            "GH_SEARCH_PROVIDER must be one of openai, anthropic, deepseek."
-        )
-    cfg.require(["github_token", required_key])
+    cfg.require(["github_token", _required_key_for(provider)])
     print(
         f"config ok (model={canonical}, provider={provider}, "
         f"max_turns={cfg.max_turns}, log_root={cfg.log_root})"
@@ -230,6 +230,13 @@ def _cmd_check(_: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Parse CLI args, dispatch the selected command, and return a process exit code.
+
+    Exit-code contract:
+    - `0`: successful execution, including bare `gh-search` help output
+    - `1`: config or runtime failure reported by this CLI layer
+    - `2`: command-line usage error detected by argparse
+    """
     # Opt-in, cwd-scoped .env load. Never walks up — tests that monkeypatch
     # cwd to a scratch dir will see an empty environment.
     cwd_env = Path.cwd() / ".env"
@@ -254,33 +261,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"config error: {exc}\n")
         return 1
 
+    # argparse treats an unknown subcommand as a usage error and exits with
+    # status 2. The explicit return is only a defensive fallback.
     parser.error(f"unknown command: {args.command}")
     return 2
 
 
 def _resolve_llm(cfg: Config, model_name: str) -> LLMBinding:
-    """Route a raw model name to the right provider adapter (PHASE2_PLAN §3.0).
-
-    Any factory-level failure — bad canonical name, typo in
-    `GH_SEARCH_PROVIDER`, missing credential — is normalised into
-    `ConfigError` so the CLI's top-level handler can render a clean
-    "config error: ..." message instead of a stack trace.
-    """
+    """Route a raw model name to the right provider adapter (PHASE2_PLAN §3.0)."""
     try:
         canonical = canonical_model_name(model_name)
-        provider = cfg.provider_override or provider_for(canonical)
+        provider = provider_for(canonical)
     except UnknownModelError as exc:
         raise ConfigError(str(exc)) from exc
 
-    required_key = _required_key_for(provider)
-    if required_key is None:
-        # provider_override with an unknown value (e.g. typo) — fail early
-        # with a helpful hint rather than waiting for make_llm to raise.
-        raise ConfigError(
-            f"unknown provider: {provider!r}. "
-            "GH_SEARCH_PROVIDER must be one of openai, anthropic, deepseek."
-        )
-    cfg.require([required_key])
+    cfg.require([_required_key_for(provider)])
 
     try:
         return make_llm(
@@ -289,25 +284,36 @@ def _resolve_llm(cfg: Config, model_name: str) -> LLMBinding:
             anthropic_api_key=cfg.anthropic_api_key,
             deepseek_api_key=cfg.deepseek_api_key,
             deepseek_endpoint=cfg.deepseek_endpoint,
-            provider_override=cfg.provider_override,  # type: ignore[arg-type]
         )
     except (ProviderConfigError, UnknownModelError) as exc:
         raise ConfigError(str(exc)) from exc
 
 
-def _required_key_for(provider: str) -> str | None:
-    return {
+def _required_key_for(provider: str) -> str:
+    """Map a provider name to the config field that must be present."""
+    required = {
         "openai": "openai_api_key",
         "anthropic": "anthropic_api_key",
         "deepseek": "deepseek_api_key",
     }.get(provider)
+    if required is None:
+        raise ConfigError(f"unknown provider mapping for {provider!r}")
+    return required
 
 
 def _now() -> str:
+    """Return the current UTC timestamp in ISO 8601 form."""
     return datetime.now(tz=timezone.utc).isoformat()
 
 
+def _default_eval_run_id(model_name: str, now: datetime | None = None) -> str:
+    """Build a stable default smoke-eval run id from model name and UTC time."""
+    timestamp = (now or datetime.now(tz=timezone.utc)).strftime("%Y%m%dT%H%M%SZ")
+    return f"{model_name}_{timestamp}"
+
+
 def _derive_final_outcome(state: SharedAgentState) -> str:
+    """Collapse the final agent state into the CLI/eval outcome label."""
     if state.intention_judge.intent_status is IntentStatus.UNSUPPORTED:
         return "rejected"
     if state.intention_judge.intent_status is IntentStatus.AMBIGUOUS:
@@ -332,6 +338,7 @@ def _render(
     run_id: str,
     session_dir: Path | None = None,
 ) -> str:
+    """Render a human-facing summary of the finished session."""
     outcome = _derive_final_outcome(state)
     header = f"[{outcome}] session_id={session_id} run_id={run_id}"
     terminate_val = (
@@ -376,6 +383,7 @@ def _render(
 
 
 def _suggestion_for(outcome: str) -> str:
+    """Return the canned next-step hint for a non-success outcome."""
     mapping = {
         "no_results": "try broader keywords or relax star / date constraints",
         "rejected": "refine your question to describe a specific GitHub repository search",
@@ -387,6 +395,7 @@ def _suggestion_for(outcome: str) -> str:
 
 
 def _per_turn_summary(session_dir: Path | None) -> list[str]:
+    """Summarize turn transitions from `turns.jsonl` for max-turn failures."""
     if session_dir is None:
         return []
     turns_path = session_dir / "turns.jsonl"

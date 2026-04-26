@@ -16,6 +16,7 @@ from gh_search.schemas import FinalState, RunLog, ToolName, TurnLog
 
 
 class SessionLogger:
+    """Write the canonical on-disk artifacts for one agent session."""
     def __init__(self, session_id: str, log_root: Path):
         self._session_id = session_id
         self._root = Path(log_root)
@@ -26,9 +27,11 @@ class SessionLogger:
 
     @property
     def session_id(self) -> str:
+        """Expose the session id so callers can thread it into logs and state."""
         return self._session_id
 
     def append_turn(self, turn: TurnLog) -> None:
+        """Append one `TurnLog` row to `turns.jsonl`."""
         if turn.session_id != self._session_id:
             raise ValueError(
                 f"turn.session_id={turn.session_id!r} does not match "
@@ -41,6 +44,7 @@ class SessionLogger:
     def write_turn_artifact(
         self, turn_index: int, tool_name: ToolName | str, payload: dict
     ) -> Path:
+        """Write the verbose per-turn artifact JSON for later inspection."""
         tool_value = tool_name.value if isinstance(tool_name, ToolName) else tool_name
         artifact = self.artifacts_dir / f"turn_{turn_index:02d}_{tool_value}.json"
         artifact.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -58,6 +62,7 @@ class SessionLogger:
         return path
 
     def finalize(self, run_log: RunLog, final_state: FinalState) -> None:
+        """Write the session-level summary files once the loop is finished."""
         if run_log.session_id != self._session_id:
             raise ValueError("run_log.session_id must match logger session_id")
         if final_state.session_id != self._session_id:

@@ -1,6 +1,6 @@
 """Prompt composition (PHASE2_PLAN.md §3.0).
 
-Lays the `prompts/core/{name}-v{N}.md` + `prompts/appendix/{name}-{model}-v{N}.md`
+Lays the `prompts/core/{name}.md` + `prompts/appendix/{name}-{model}.md`
 filesystem layout into a tiny loader. Adapters stay pure: they treat
 composed text as opaque `system_prompt`, and model-specific appendices are
 bound at factory time (PHASE2_PLAN §1.1 — model-specific tuning stays
@@ -9,8 +9,6 @@ isolated from the core layer).
 Naming:
 - `name` identifies the tool / prompt role (e.g. `parse`, `intention`).
 - `model` must already be canonicalised (use `canonical_model_name(...)`).
-- versions are separate for core and appendix so Iteration 1 tuning can
-  bump one without touching the other.
 
 Returns `PromptBundle` with the composed system prompt and the canonical
 `prompt_version` label written into run_config / matrix rows.
@@ -49,13 +47,12 @@ def load_prompt_bundle(
     name: str,
     model: str,
     *,
-    core_version: str = "v1",
-    appendix_version: str = "v1",
     prompts_root: Path | None = None,
 ) -> PromptBundle:
+    """Load the core prompt and optional model-specific appendix from disk."""
     root = Path(prompts_root) if prompts_root is not None else DEFAULT_PROMPTS_ROOT
-    core_path = root / "core" / f"{name}-{core_version}.md"
-    appendix_path = root / "appendix" / f"{name}-{model}-{appendix_version}.md"
+    core_path = root / "core" / f"{name}.md"
+    appendix_path = root / "appendix" / f"{name}-{model}.md"
 
     core_text = _read_text(core_path, required=True)
     appendix_text = _read_text(appendix_path, required=False)
@@ -63,9 +60,7 @@ def load_prompt_bundle(
     if appendix_text is not None and not _has_non_comment_content(appendix_text):
         appendix_text = None
 
-    prompt_version = (
-        f"core-{core_version} + appendix-{model}-{appendix_version}"
-    )
+    prompt_version = f"core + appendix-{model}"
     return PromptBundle(
         core_text=core_text,
         appendix_text=appendix_text,
@@ -88,6 +83,7 @@ def compose_system_for(name: str, llm, *, default_model: str = "gpt-4.1-mini") -
 
 
 def _read_text(path: Path, *, required: bool) -> str | None:
+    """Read a prompt file, optionally tolerating a missing appendix file."""
     if not path.is_file():
         if required:
             raise FileNotFoundError(f"prompt file missing: {path}")
@@ -99,6 +95,7 @@ _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
 def _has_non_comment_content(text: str) -> bool:
+    """Treat comment-only appendix files as absent."""
     stripped = _HTML_COMMENT.sub("", text).strip()
     return bool(stripped)
 

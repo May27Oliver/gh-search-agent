@@ -10,6 +10,7 @@ from gh_search.schemas import StructuredQuery
 
 
 def compile_github_query(sq: StructuredQuery) -> str:
+    """Encode a validated `StructuredQuery` into GitHub's `q` syntax."""
     parts: list[str] = []
     if sq.keywords:
         parts.append(" ".join(sq.keywords))

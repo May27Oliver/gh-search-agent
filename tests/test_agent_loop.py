@@ -327,15 +327,15 @@ def test_invalid_max_turns_rejected():
         )
 
 
-# ITER5_DATE_TUNING_SPEC §8.1.1: run_agent_loop must forward `today` kwarg
-# to parse_query so eval path can pin DATASET_TODAY_ANCHOR.
-def test_run_agent_loop_forwards_today_to_parse_query(monkeypatch):
+# ITER5_DATE_TUNING_SPEC §8.1.1: run_agent_loop must forward `reference_date`
+# to parse_query so eval path can pin the dataset metadata reference date.
+def test_run_agent_loop_forwards_reference_date_to_parse_query(monkeypatch):
     from datetime import date
 
     captured: dict = {}
 
-    def fake_parse_query(state, *, llm, today=None):
-        captured["today"] = today
+    def fake_parse_query(state, *, llm, reference_date=None):
+        captured["reference_date"] = reference_date
         # route to validate_query so loop exits cleanly
         from gh_search.schemas import Control, ToolName
 
@@ -360,17 +360,17 @@ def test_run_agent_loop_forwards_today_to_parse_query(monkeypatch):
         llm=llm,
         github=_fake_github([]),
         max_turns=5,
-        today=date(2026, 4, 23),
+        reference_date=date(2026, 4, 23),
     )
 
-    assert captured["today"] == date(2026, 4, 23)
+    assert captured["reference_date"] == date(2026, 4, 23)
 
 
-def test_run_agent_loop_today_defaults_to_none_when_not_provided(monkeypatch):
+def test_run_agent_loop_reference_date_defaults_to_none_when_not_provided(monkeypatch):
     captured: dict = {}
 
-    def fake_parse_query(state, *, llm, today=None):
-        captured["today"] = today
+    def fake_parse_query(state, *, llm, reference_date=None):
+        captured["reference_date"] = reference_date
         from gh_search.schemas import Control, ToolName
 
         return state.model_copy(
@@ -396,4 +396,4 @@ def test_run_agent_loop_today_defaults_to_none_when_not_provided(monkeypatch):
         max_turns=5,
     )
 
-    assert captured["today"] is None
+    assert captured["reference_date"] is None

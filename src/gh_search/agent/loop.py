@@ -44,8 +44,9 @@ def run_agent_loop(
     results_sink: list[Repository] | None = None,
     session_logger: SessionLogger | None = None,
     *,
-    today: date | None = None,
+    reference_date: date | None = None,
 ) -> SharedAgentState:
+    """Run the fixed tool pipeline until a tool terminates or turns are exhausted."""
     if max_turns < 1:
         raise ValueError(f"max_turns must be >= 1, got {max_turns}")
 
@@ -69,7 +70,7 @@ def run_agent_loop(
             llm=recording_llm,
             github=github,
             results_sink=results_sink,
-            today=today,
+            reference_date=reference_date,
         )
         latency_ms = int((time.perf_counter() - started) * 1000)
         new_state = new_state.model_copy(update={"turn_index": turn})
@@ -108,6 +109,7 @@ def run_agent_loop(
 
 
 def _initial_state(user_query: str, run_id: str, max_turns: int) -> SharedAgentState:
+    """Create turn-zero state before any tool has run."""
     return SharedAgentState(
         run_id=run_id,
         turn_index=0,
@@ -137,12 +139,13 @@ def _dispatch(
     llm: LLMJsonCall,
     github: GitHubClient,
     results_sink: list[Repository] | None,
-    today: date | None = None,
+    reference_date: date | None = None,
 ) -> SharedAgentState:
+    """Call the tool named in `state.control.next_tool`."""
     if tool is ToolName.INTENTION_JUDGE:
         return intention_judge(state, llm=llm)
     if tool is ToolName.PARSE_QUERY:
-        return parse_query(state, llm=llm, today=today)
+        return parse_query(state, llm=llm, reference_date=reference_date)
     if tool is ToolName.VALIDATE_QUERY:
         return validate_query(state)
     if tool is ToolName.REPAIR_QUERY:
@@ -170,6 +173,7 @@ def _turn_log(
     raw_model_output: str | None,
     keyword_trace: KeywordNormalizationTrace | None,
 ) -> TurnLog:
+    """Project the current state into the persisted per-turn log schema."""
     return TurnLog(
         session_id=session_id,
         run_id=state.run_id,
@@ -192,6 +196,7 @@ def _turn_log(
 
 
 def _record_llm(llm: LLMJsonCall, raw_box: list[str]) -> LLMJsonCall:
+    """Wrap an LLM call so the loop can capture raw model output for logging."""
     def wrapped(system_prompt: str, user_message: str, response_schema: dict) -> LLMResponse:
         response = llm(system_prompt, user_message, response_schema)
         raw_box.append(response.raw_text)
@@ -214,6 +219,7 @@ def _artifact_payload(
     llm: LLMJsonCall,
     keyword_trace: KeywordNormalizationTrace | None,
 ) -> dict:
+    """Build the per-turn artifact with input/output state and a minimal diff."""
     prev_dump = prev.model_dump(mode="json")
     new_dump = new.model_dump(mode="json")
     diff = {k: new_dump[k] for k in new_dump if new_dump[k] != prev_dump.get(k)}
@@ -231,13 +237,14 @@ def _artifact_payload(
 
 
 def _prompt_version_for(tool: ToolName, llm: LLMJsonCall) -> str | None:
+    """Derive the prompt version label for tools that read prompt bundles."""
     model = getattr(llm, "model_name", None)
     if tool is ToolName.PARSE_QUERY and model is not None:
-        return f"parse-core-v1 + parse-{model}-v1"
+        return f"parse-core + parse-{model}"
     if tool is ToolName.REPAIR_QUERY and model is not None:
-        return f"repair-core-v1 + repair-{model}-v1"
+        return f"repair-core + repair-{model}"
     if tool is ToolName.INTENTION_JUDGE and model is not None:
-        return f"intention-core-v1 + intention-{model}-v1"
+        return f"intention-core + intention-{model}"
     return None
 
 
@@ -276,5 +283,3 @@ def _keyword_trace(
         normalized_keywords=normalized,
         violations=violations,
     )
-
-
