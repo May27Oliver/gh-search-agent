@@ -233,9 +233,9 @@ def build_matrix(
 
 
 def _prompt_family_version(rows: list[dict]) -> str | list[str] | None:
-    """Extract the shared `core-vN` part across rows.
+    """Extract the shared `core` family part across rows.
 
-    Row `prompt_version` looks like `"core-v1 + appendix-{model}-v1"`;
+    Row `prompt_version` typically looks like `"core + appendix-{model}"`;
     legacy rows may be a bare label like `"phase1-v1"`. We keep just the
     chunk before ` + ` so the top-level metadata describes what's actually
     shared across the matrix (the core prompt) without implying a single

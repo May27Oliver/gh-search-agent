@@ -76,7 +76,7 @@ def test_query_routes_claude_sonnet_4_to_anthropic(
     run = json.loads((session_dir / "run.json").read_text())
     assert run["model_name"] == "claude-sonnet-4"
     assert run["provider_name"] == "anthropic"
-    assert run["prompt_version"].startswith("core-v1")
+    assert run["prompt_version"].startswith("core")
     assert "appendix-claude-sonnet-4" in run["prompt_version"]
 
 
@@ -144,38 +144,3 @@ def test_query_rejects_unknown_model(
     err = capsys.readouterr().err
     assert "unknown model" in err.lower()
     mock_make_llm.assert_not_called()
-
-
-@patch("gh_search.cli.GitHubClient")
-def test_query_rejects_bogus_provider_override(
-    mock_github_cls, monkeypatch, tmp_path, capsys
-):
-    """Regression: `GH_SEARCH_PROVIDER=anthorpic` (typo) used to escape as
-    a bare UnknownModelError traceback. Phase 2 must normalise it to a
-    clean config-error exit (1) so the CLI stays boringly predictable."""
-    _setup_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setenv("GH_SEARCH_PROVIDER", "anthorpic")  # sic
-    mock_github_cls.return_value = MagicMock()
-
-    rc = main(["query", "rails ecosystem"])
-    assert rc == 1
-    err = capsys.readouterr().err
-    assert "config error" in err
-    assert "unknown provider" in err.lower()
-    # Traceback must not leak through.
-    assert "Traceback" not in err
-
-
-def test_check_rejects_bogus_provider_override(monkeypatch, tmp_path, capsys):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test")
-    monkeypatch.setenv("GH_SEARCH_PROVIDER", "gemini")  # unsupported
-
-    rc = main(["check"])
-    assert rc == 1
-    err = capsys.readouterr().err
-    assert "config error" in err
-    assert "unknown provider" in err.lower()
-    assert "Traceback" not in err

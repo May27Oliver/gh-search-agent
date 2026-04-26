@@ -17,6 +17,12 @@
 | [`compile_github_query.py`](./compile_github_query.py) | 呼叫 `compiler.compile_github_query()`，把結構化查詢變成 GitHub 認得的字串，寫進 `state.compiled_query`。 | `compiler.py` |
 | [`execute_github_search.py`](./execute_github_search.py) | 實際打 GitHub API，把各種錯誤轉成 `ExecutionStatus`，把搜到的 `Repository` 清單透過 `results_sink` 傳出去。 | `github/` |
 
+如果你是要準備面試說明，實際讀檔時建議每支 tool 都用同一個順序看：
+
+1. 先看主函數（例如 `parse_query()`），抓它讀哪些 state 欄位、寫回哪些欄位。
+2. 再看它依賴的 domain service 或 helper（例如 `validate_query()` 會去看 `_normalize_structured_query()` 跟 `validator.validate_structured_query()`）。
+3. 最後回頭確認它把 `state.control.next_tool` 設成什麼。這一步最重要，因為 repo 的流程其實是 tool 在決定，不是 loop 在硬編排。
+
 ## 所有 tool 都必須遵守的約定
 
 - **Signature 要一致**。全部都是 `fn(state, *, llm=..., github=..., results_sink=...) -> SharedAgentState`，沒用到的參數就忽略。這樣 loop 才能用同一套機制呼叫每個 tool，不用 if-else 判斷。

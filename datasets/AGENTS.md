@@ -19,6 +19,13 @@
 
 ```jsonc
 {
+  "metadata": {
+    // 可選；如果題庫裡有 relative-date 題（例如 this year / last year），
+    // 這裡應明確寫出標註時採用的 reference_date。
+    "reference_date": "2026-04-23"
+  },
+  "items": [
+    {
   "id": "smoke_001",
   "input_query": "使用者實際輸入的自然語言句子",
   "case_type": "normal | compound_constraints | rejection | ...",
@@ -40,10 +47,14 @@
     "order": "desc",
     "limit": 10
   }
+    }
+  ]
 }
 ```
 
 欄位結構跟 `src/gh_search/schemas/structured_query.py` 完全對齊。判分的細節在 [`src/gh_search/eval/AGENTS.md`](../src/gh_search/eval/AGENTS.md)。
+
+如果題庫裡沒有 relative-date 題，`metadata.reference_date` 可以省略；但只要有像 `last year`、`this year`、`去年`、`今年` 這種題目，就應該把標註時採用的日期寫在 metadata，而不是藏在程式碼常數裡。
 
 ## 踩過的坑（請避免再犯）
 

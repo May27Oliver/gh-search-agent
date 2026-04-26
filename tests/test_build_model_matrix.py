@@ -34,7 +34,7 @@ def _write_run(
     per_items: list[dict],
     outcome_counts: dict[str, int],
     correct: int,
-    prompt_version: str = "core-v1 + appendix-gpt41mini-v1",
+    prompt_version: str = "core + appendix-gpt41mini",
     provider_name: str | None = None,
 ) -> None:
     run_dir = artifacts_root / eval_run_id
@@ -329,7 +329,7 @@ def test_matrix_top_level_exposes_prompt_family_not_misleading_prompt_version(
 ) -> None:
     """Cross-provider matrices must not advertise a single model's
     `prompt_version` at the top level — that used to be `rows[0]`'s full
-    `core-v1 + appendix-<model>-v1`, which silently hid per-row appendix
+    `core + appendix-<model>`, which silently hid per-row appendix
     divergence. Top-level should only carry the shared core family."""
     root = tmp_path / "artifacts" / "eval"
     _write_run(
@@ -339,7 +339,7 @@ def test_matrix_top_level_exposes_prompt_family_not_misleading_prompt_version(
         per_items=[_item("q012", True)],
         outcome_counts={"success": 1},
         correct=1,
-        prompt_version="core-v1 + appendix-gpt-4.1-mini-v1",
+        prompt_version="core + appendix-gpt-4.1-mini",
     )
     _write_run(
         artifacts_root=root,
@@ -348,7 +348,7 @@ def test_matrix_top_level_exposes_prompt_family_not_misleading_prompt_version(
         per_items=[_item("q012", True)],
         outcome_counts={"success": 1},
         correct=1,
-        prompt_version="core-v1 + appendix-claude-sonnet-4-v1",
+        prompt_version="core + appendix-claude-sonnet-4",
     )
 
     matrix, _ = BMM.build_matrix(
@@ -358,14 +358,14 @@ def test_matrix_top_level_exposes_prompt_family_not_misleading_prompt_version(
         artifacts_root=root,
     )
 
-    assert matrix["prompt_family_version"] == "core-v1"
+    assert matrix["prompt_family_version"] == "core"
     # Top-level prompt_version must no longer leak any row's appendix.
     assert "prompt_version" not in matrix
     # Row-level prompt_version keeps the full `core + appendix` identifier.
     pvs = {r["prompt_version"] for r in matrix["rows"]}
     assert pvs == {
-        "core-v1 + appendix-gpt-4.1-mini-v1",
-        "core-v1 + appendix-claude-sonnet-4-v1",
+        "core + appendix-gpt-4.1-mini",
+        "core + appendix-claude-sonnet-4",
     }
 
 
@@ -380,7 +380,7 @@ def test_matrix_flags_mixed_core_versions_visibly(tmp_path: Path) -> None:
         per_items=[_item("q012", True)],
         outcome_counts={"success": 1},
         correct=1,
-        prompt_version="core-v1 + appendix-gpt-4.1-mini-v1",
+        prompt_version="core + appendix-gpt-4.1-mini",
     )
     _write_run(
         artifacts_root=root,
@@ -389,7 +389,7 @@ def test_matrix_flags_mixed_core_versions_visibly(tmp_path: Path) -> None:
         per_items=[_item("q012", True)],
         outcome_counts={"success": 1},
         correct=1,
-        prompt_version="core-v2 + appendix-claude-sonnet-4-v1",
+        prompt_version="core-alt + appendix-claude-sonnet-4",
     )
 
     matrix, _ = BMM.build_matrix(
@@ -398,7 +398,7 @@ def test_matrix_flags_mixed_core_versions_visibly(tmp_path: Path) -> None:
         run_ids=["r_v1", "r_v2"],
         artifacts_root=root,
     )
-    assert matrix["prompt_family_version"] == ["core-v1", "core-v2"]
+    assert matrix["prompt_family_version"] == ["core", "core-alt"]
 
 
 def test_legacy_bare_prompt_label_stays_as_family(tmp_path: Path) -> None:

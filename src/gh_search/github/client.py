@@ -36,6 +36,7 @@ class GitHubTransportError(GitHubError):
 
 @dataclass(frozen=True)
 class Repository:
+    """Normalized repository DTO returned by the GitHub client."""
     name: str
     url: str
     stars: int
@@ -44,6 +45,7 @@ class Repository:
 
 
 class GitHubClient:
+    """Small wrapper around GitHub's repository search endpoint."""
     def __init__(self, token: str | None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS):
         self._token = token
         self._timeout = timeout_seconds
@@ -55,6 +57,7 @@ class GitHubClient:
         order: str | None,
         per_page: int,
     ) -> list[Repository]:
+        """Execute one repository search request and normalize the response."""
         params: dict[str, str | int] = {"q": query, "per_page": per_page}
         if sort is not None:
             params["sort"] = sort
@@ -89,6 +92,7 @@ class GitHubClient:
 
 
 def _normalize(payload: dict) -> list[Repository]:
+    """Convert GitHub's JSON payload into repo DTOs used by the app."""
     items = payload.get("items") or []
     return [
         Repository(
@@ -103,6 +107,7 @@ def _normalize(payload: dict) -> list[Repository]:
 
 
 def _message(resp: requests.Response) -> str:
+    """Extract the most useful error message from a failed HTTP response."""
     try:
         return str(resp.json().get("message") or resp.text)
     except ValueError:
@@ -110,6 +115,7 @@ def _message(resp: requests.Response) -> str:
 
 
 def _is_rate_limited(resp: requests.Response) -> bool:
+    """Detect GitHub rate limits from headers first, body second."""
     remaining = resp.headers.get("X-RateLimit-Remaining")
     if remaining == "0":
         return True

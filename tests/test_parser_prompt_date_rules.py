@@ -1,6 +1,6 @@
 """ITER5_DATE_TUNING_SPEC §8.2 + §8.3: parser prompt date rule contract.
 
-These tests pin the presence of iter5 date rules in `prompts/core/parse-v1.md`
+These tests pin the presence of iter5 date rules in `prompts/core/parse.md`
 and guard against accidental removal of iter4 keyword policy / other non-date
 chapters. They don't attempt to judge LLM behavior — that's validated by
 cross-model smoke rerun (§9.2).
@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_PARSE_PROMPT_PATH = _PROJECT_ROOT / "prompts" / "core" / "parse-v1.md"
+_PARSE_PROMPT_PATH = _PROJECT_ROOT / "prompts" / "core" / "parse.md"
 
 
 def _parse_prompt_text() -> str:
@@ -52,7 +52,7 @@ DATE_RULE_CONTRACT_PHRASES = [
 def test_parse_prompt_contains_iter5_date_rule(phrase: str) -> None:
     text = _parse_prompt_text()
     assert phrase in text, (
-        f"iter5 date-rule contract phrase {phrase!r} missing from parse-v1.md"
+        f"iter5 date-rule contract phrase {phrase!r} missing from parse.md"
     )
 
 
@@ -84,7 +84,7 @@ NON_DATE_CONTRACT_PHRASES = [
 def test_parse_prompt_preserves_non_date_chapters(phrase: str) -> None:
     text = _parse_prompt_text()
     assert phrase in text, (
-        f"iter5 must not drop non-date content {phrase!r} from parse-v1.md"
+        f"iter5 must not drop non-date content {phrase!r} from parse.md"
     )
 
 

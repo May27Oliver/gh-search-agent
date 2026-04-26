@@ -45,10 +45,12 @@ class SmokeSummary:
     outcome_counts: dict[str, int]
 
 
-# ITER5_DATE_TUNING_SPEC §7.1.3: dataset q013 / q017 notes fix the annotation
-# anchor at 2026-04-23. Pin eval `today` to this constant so relative-date
-# rules resolve consistently across reruns regardless of wall-clock date.
-DATASET_TODAY_ANCHOR: date = date(2026, 4, 23)
+@dataclass(frozen=True)
+class EvalDataset:
+    """Dataset payload plus optional metadata shared across every eval item."""
+
+    items: list[dict]
+    reference_date: date | None = None
 
 
 def run_smoke_eval(
@@ -62,17 +64,27 @@ def run_smoke_eval(
     provider_name: str,
     prompt_version: str | None = None,
     max_turns: int = 5,
-    today_anchor: date = DATASET_TODAY_ANCHOR,
+    reference_date: date | None = None,
 ) -> SmokeSummary:
-    dataset = json.loads(Path(dataset_path).read_text())
+    """Run the full agent loop for each dataset item and aggregate scores."""
+    dataset = _load_eval_dataset(dataset_path)
+    effective_reference_date = (
+        reference_date if reference_date is not None else dataset.reference_date
+    )
     run_dir = eval_artifacts_root / eval_run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     if prompt_version is None:
-        prompt_version = f"core-v1 + appendix-{model_name}-v1"
+        prompt_version = f"core + appendix-{model_name}"
 
     _write_run_config(
-        run_dir, dataset_path, model_name, provider_name, prompt_version, max_turns
+        run_dir,
+        dataset_path,
+        model_name,
+        provider_name,
+        prompt_version,
+        max_turns,
+        effective_reference_date,
     )
 
     per_item_path = run_dir / "per_item_results.jsonl"
@@ -84,7 +96,7 @@ def run_smoke_eval(
     per_item_entries: list[dict] = []
 
     with per_item_path.open("a", encoding="utf-8") as per_item_fp:
-        for item in dataset:
+        for item in dataset.items:
             session_id = f"sess_{uuid.uuid4().hex[:12]}"
             run_id = f"run_{uuid.uuid4().hex[:12]}"
             session_logger = SessionLogger(session_id=session_id, log_root=log_root)
@@ -99,7 +111,7 @@ def run_smoke_eval(
                 max_turns=max_turns,
                 results_sink=results,
                 session_logger=session_logger,
-                today=today_anchor,
+                reference_date=effective_reference_date,
             )
             ended_at = _now()
 
@@ -163,7 +175,7 @@ def run_smoke_eval(
 
     per_item_json_path.write_text(json.dumps(per_item_entries, indent=2))
 
-    total = len(dataset)
+    total = len(dataset.items)
     accuracy = correct_count / total if total else 0.0
     summary = SmokeSummary(
         eval_run_id=eval_run_id,
@@ -200,7 +212,9 @@ def _write_run_config(
     provider_name: str,
     prompt_version: str,
     max_turns: int,
+    reference_date: date | None,
 ) -> None:
+    """Persist eval-level metadata shared by every item in the run."""
     (run_dir / "run_config.json").write_text(
         json.dumps(
             {
@@ -209,11 +223,39 @@ def _write_run_config(
                 "provider_name": provider_name,
                 "prompt_version": prompt_version,
                 "max_turns": max_turns,
+                "reference_date": (
+                    reference_date.isoformat() if reference_date is not None else None
+                ),
                 "started_at": _now(),
             },
             indent=2,
         )
     )
+
+
+def _load_eval_dataset(dataset_path: Path) -> EvalDataset:
+    """Load eval dataset items plus optional file-level metadata."""
+    raw = json.loads(Path(dataset_path).read_text())
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"dataset must be an object with 'metadata' and 'items', got {type(raw).__name__}"
+        )
+
+    items = raw.get("items")
+    if not isinstance(items, list):
+        raise ValueError("dataset object must contain an 'items' list")
+
+    metadata = raw.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("dataset metadata must be an object when present")
+
+    reference_date_raw = metadata.get("reference_date")
+    reference_date = (
+        date.fromisoformat(reference_date_raw)
+        if isinstance(reference_date_raw, str) and reference_date_raw
+        else None
+    )
+    return EvalDataset(items=items, reference_date=reference_date)
 
 
 def _per_item_entry(
@@ -231,6 +273,7 @@ def _per_item_entry(
     retrieved_repos: list[Repository],
     retrieval_artifact_path: Path | None,
 ) -> dict:
+    """Build the JSONL row emitted for one evaluated dataset item."""
     retrieved_summary = (
         summarize_repositories(retrieved_repos)
         if has_retrieval_data(final_state.execution)
@@ -281,6 +324,7 @@ def _write_session_finalization(
     predicted_query: StructuredQuery | None,
     score,
 ) -> None:
+    """Write `run.json`, `final_state.json`, and `eval_result.json` for one item."""
     run_log = RunLog(
         session_id=session_id,
         run_id=run_id,
@@ -329,4 +373,5 @@ def _write_session_finalization(
 
 
 def _now() -> str:
+    """Return the current UTC timestamp in ISO 8601 form."""
     return datetime.now(tz=timezone.utc).isoformat()
