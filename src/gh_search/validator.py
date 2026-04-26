@@ -17,6 +17,7 @@ from gh_search.schemas import StructuredQuery, Validation, ValidationIssue
 
 
 def validate_structured_query(sq: StructuredQuery) -> Validation:
+    """Check cross-field semantics that the schema alone cannot express."""
     errors: list[ValidationIssue] = []
 
     if sq.min_stars is not None and sq.max_stars is not None and sq.min_stars > sq.max_stars:
@@ -58,6 +59,7 @@ def validate_structured_query(sq: StructuredQuery) -> Validation:
 
 
 def _has_no_effective_condition(sq: StructuredQuery) -> bool:
+    """Return whether the query would compile to an effectively empty search."""
     return (
         not sq.keywords
         and sq.language is None

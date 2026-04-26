@@ -30,6 +30,7 @@ from gh_search.validator import validate_structured_query
 
 
 def validate_query(state: SharedAgentState) -> SharedAgentState:
+    """Normalize parser output, validate semantics, and choose compile vs repair."""
     if state.structured_query is None:
         validation = Validation(
             is_valid=False,
@@ -76,6 +77,7 @@ def validate_query(state: SharedAgentState) -> SharedAgentState:
 def _normalize_structured_query(
     sq: StructuredQuery, user_query: str
 ) -> StructuredQuery:
+    """Apply deterministic post-parse rewrites before semantic validation."""
     normalized_keywords = normalize_keywords(list(sq.keywords), language=sq.language)
     suppressed_language = _suppress_unsupported_language(sq.language, user_query)
     normalized_min_stars, normalized_max_stars = _normalize_star_bounds(
@@ -259,6 +261,7 @@ _RANKING_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def _has_ranking_intent(user_query: str) -> bool:
+    """Return whether the query explicitly asks for popularity-style ranking."""
     return any(p.search(user_query) for p in _RANKING_PATTERNS)
 
 

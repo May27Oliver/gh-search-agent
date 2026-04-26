@@ -3,7 +3,7 @@
 Takes a structurally-valid but semantically-rejected StructuredQuery plus the
 validator's error messages, and asks the LLM to produce a corrected query.
 Routes back to validate_query unconditionally (TOOLS.md §5). Prompt text is
-loaded from `prompts/core/repair-v1.md` + per-model appendix at call time so
+loaded from `prompts/core/repair.md` + per-model appendix at call time so
 repair-specific tuning can diverge per model (PHASE2_PLAN §1.1).
 """
 from __future__ import annotations
@@ -21,6 +21,7 @@ PROMPT_NAME = "repair"
 
 
 def repair_query(state: SharedAgentState, llm: LLMJsonCall) -> SharedAgentState:
+    """Ask the LLM to fix a query using the validator's structured errors."""
     errors_payload = [issue.model_dump(mode="json") for issue in state.validation.errors]
     user_message = (
         f"User query: {state.user_query}\n"
@@ -50,4 +51,5 @@ def repair_query(state: SharedAgentState, llm: LLMJsonCall) -> SharedAgentState:
 
 
 def _dump(sq: StructuredQuery | None) -> dict | None:
+    """Serialize the current structured query for the repair prompt payload."""
     return sq.model_dump(mode="json") if sq is not None else None

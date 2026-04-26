@@ -1,4 +1,8 @@
-[
+{
+  "metadata": {
+    "reference_date": "2026-04-23"
+  },
+  "items": [
   {
     "id": "q001",
     "input_query": "find me some popular react component libraries",
@@ -824,4 +828,5 @@
     "review_notes": "修正嚴格數值邊界，保留衝突作為 adversarial case。",
     "recommended_dataset": "eval"
   }
-]
+  ]
+}

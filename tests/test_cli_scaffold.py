@@ -1,9 +1,12 @@
 """Task 3.1 verification: CLI scaffold boots, --help works, missing config fails clearly."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from gh_search.cli import main
+from gh_search.cli import _default_eval_run_id, main
 from gh_search.config import ConfigError, load_config
 
 
@@ -77,3 +80,43 @@ def test_load_config_never_walks_up_for_dotenv(monkeypatch, tmp_path):
     cfg = load_config()
     assert cfg.openai_api_key is None
     assert cfg.github_token is None
+
+
+def test_default_eval_run_id_uses_model_name_and_utc_timestamp():
+    run_id = _default_eval_run_id(
+        "gpt-4.1-mini",
+        now=datetime(2026, 4, 25, 1, 2, 3, tzinfo=timezone.utc),
+    )
+
+    assert run_id == "gpt-4.1-mini_20260425T010203Z"
+
+
+@patch("gh_search.cli._resolve_llm")
+@patch("gh_search.cli.GitHubClient")
+@patch("gh_search.eval.runner.run_smoke_eval")
+def test_smoke_defaults_eval_run_id_to_model_plus_timestamp(
+    mock_run_smoke_eval, mock_github_cls, mock_resolve_llm, monkeypatch, tmp_path, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test")
+    mock_resolve_llm.return_value = MagicMock(
+        call=MagicMock(),
+        provider_name="openai",
+        model_name="gpt-4.1-mini",
+    )
+    mock_github_cls.return_value = MagicMock()
+    mock_run_smoke_eval.return_value = MagicMock(
+        model_name="gpt-4.1-mini",
+        accuracy=1.0,
+        correct=3,
+        total=3,
+        outcome_counts={"success": 3},
+    )
+
+    with patch("gh_search.cli._default_eval_run_id", return_value="gpt-4.1-mini_20260425T010203Z"):
+        rc = main(["smoke"])
+
+    assert rc == 0
+    assert mock_run_smoke_eval.call_args.kwargs["eval_run_id"] == "gpt-4.1-mini_20260425T010203Z"
+    assert "gpt-4.1-mini_20260425T010203Z" in capsys.readouterr().out

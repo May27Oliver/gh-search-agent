@@ -22,6 +22,7 @@ def execute_github_search(
     github: GitHubClient,
     results_sink: list[Repository] | None = None,
 ) -> SharedAgentState:
+    """Execute the compiled query against GitHub and finalize the run state."""
     assert state.structured_query is not None
     assert state.compiled_query is not None
 

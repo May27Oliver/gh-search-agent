@@ -1,4 +1,8 @@
-[
+{
+  "metadata": {
+    "reference_date": "2026-04-23"
+  },
+  "items": [
   {
     "id": "smoke_001",
     "input_query": "find me some popular react component libraries",
@@ -44,4 +48,5 @@
     "expected_terminate_reason": "unsupported_intent",
     "ground_truth_structured_query": null
   }
-]
+  ]
+}

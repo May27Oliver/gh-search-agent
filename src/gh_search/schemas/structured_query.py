@@ -11,6 +11,7 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _validate_date(value: str | None, field: str) -> str | None:
+    """Validate the repo-wide canonical date string format."""
     if value is None:
         return None
     if not _DATE_RE.match(value):

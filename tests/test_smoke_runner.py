@@ -6,7 +6,9 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from gh_search.eval.runner import DATASET_TODAY_ANCHOR, run_smoke_eval
+import pytest
+
+from gh_search.eval.runner import _load_eval_dataset, run_smoke_eval
 from gh_search.github import Repository
 from gh_search.llm import LLMResponse
 
@@ -207,17 +209,26 @@ def test_smoke_runner_reports_outcome_categories(tmp_path: Path):
     assert summary.outcome_counts["rejected"] >= 1
 
 
-# ITER5_DATE_TUNING_SPEC §8.1.2: DATASET_TODAY_ANCHOR must match dataset notes
-# (q013/q017 annotate relative dates against 2026-04-23) and must be threaded
-# through run_smoke_eval → run_agent_loop → parse_query.
+# ITER5_DATE_TUNING_SPEC §8.1.2: dataset metadata pins the annotation
+# reference date (q013/q017 annotate relative dates against 2026-04-23) and
+# must be threaded through run_smoke_eval → run_agent_loop → parse_query.
 
 
-def test_dataset_today_anchor_matches_dataset_notes():
-    assert DATASET_TODAY_ANCHOR == date(2026, 4, 23)
+def test_dataset_reference_date_matches_dataset_notes():
+    dataset = _load_eval_dataset(Path("datasets/eval_dataset_reviewed.json"))
+    assert dataset.reference_date == date(2026, 4, 23)
 
 
-def test_run_smoke_eval_passes_today_anchor_to_loop(tmp_path: Path, monkeypatch):
-    seen_today: list = []
+def test_load_eval_dataset_rejects_legacy_top_level_list(tmp_path: Path):
+    dataset_path = tmp_path / "legacy.json"
+    dataset_path.write_text(json.dumps([{"id": "x", "input_query": "q"}]))
+
+    with pytest.raises(ValueError, match="dataset must be an object"):
+        _load_eval_dataset(dataset_path)
+
+
+def test_run_smoke_eval_passes_reference_date_to_loop(tmp_path: Path, monkeypatch):
+    seen_reference_dates: list = []
 
     from gh_search.schemas import (
         Control,
@@ -232,7 +243,7 @@ def test_run_smoke_eval_passes_today_anchor_to_loop(tmp_path: Path, monkeypatch)
     )
 
     def fake_loop(**kwargs):
-        seen_today.append(kwargs.get("today"))
+        seen_reference_dates.append(kwargs.get("reference_date"))
         # Build a minimal terminal state for the runner to serialize
         return SharedAgentState(
             run_id=kwargs["run_id"],
@@ -282,14 +293,15 @@ def test_run_smoke_eval_passes_today_anchor_to_loop(tmp_path: Path, monkeypatch)
         provider_name="openai",
     )
 
-    assert seen_today, "run_agent_loop not invoked"
-    assert all(t == DATASET_TODAY_ANCHOR for t in seen_today), (
-        f"expected all calls to get DATASET_TODAY_ANCHOR, got {seen_today}"
+    expected = _load_eval_dataset(Path("datasets/smoke_eval_dataset.json")).reference_date
+    assert seen_reference_dates, "run_agent_loop not invoked"
+    assert all(t == expected for t in seen_reference_dates), (
+        f"expected all calls to get {expected}, got {seen_reference_dates}"
     )
 
 
-def test_run_smoke_eval_accepts_explicit_today_anchor_override(tmp_path: Path, monkeypatch):
-    seen_today: list = []
+def test_run_smoke_eval_accepts_explicit_reference_date_override(tmp_path: Path, monkeypatch):
+    seen_reference_dates: list = []
 
     from gh_search.schemas import (
         Control,
@@ -303,7 +315,7 @@ def test_run_smoke_eval_accepts_explicit_today_anchor_override(tmp_path: Path, m
     )
 
     def fake_loop(**kwargs):
-        seen_today.append(kwargs.get("today"))
+        seen_reference_dates.append(kwargs.get("reference_date"))
         return SharedAgentState(
             run_id=kwargs["run_id"],
             turn_index=1,
@@ -351,7 +363,7 @@ def test_run_smoke_eval_accepts_explicit_today_anchor_override(tmp_path: Path, m
         eval_run_id="smoke_today_2",
         model_name="gpt-4.1-mini",
         provider_name="openai",
-        today_anchor=override,
+        reference_date=override,
     )
 
-    assert all(t == override for t in seen_today)
+    assert all(t == override for t in seen_reference_dates)

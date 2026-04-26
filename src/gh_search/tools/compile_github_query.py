@@ -10,6 +10,7 @@ from gh_search.schemas import Control, SharedAgentState, ToolName
 
 
 def compile_github_query(state: SharedAgentState) -> SharedAgentState:
+    """Compile the validated query and route the loop to execution."""
     assert state.structured_query is not None, (
         "compile_github_query called with no structured_query; "
         "agent loop must gate on validation.is_valid"

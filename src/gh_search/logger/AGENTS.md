@@ -35,7 +35,7 @@
 ## 為什麼用檔案、不用資料庫或 stdout
 
 - 這是 take-home 專案，不想引入 DB 跟遷移的複雜度。
-- JSONL / JSON 檔可以直接用 `jq`、`grep`、`less` 觀察，寫 eval scorer 也方便——`eval/scorer.py` 就是直接讀 `run.json` 來判定 outcome 的。
+- JSONL / JSON 檔可以直接用 `jq`、`grep`、`less` 觀察，寫 eval runner 也方便——`eval/runner.py` 會把 session logger 寫出的檔案和它自己算出的 score 一起整理成 eval artifacts。
 - stdout 會被 CLI 的輸出蓋過、且不能留存，不適合當黑盒子。
 
 ## 想加一個新欄位到 log 的話

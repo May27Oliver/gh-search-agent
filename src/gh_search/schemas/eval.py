@@ -7,6 +7,7 @@ from gh_search.schemas.structured_query import StructuredQuery
 
 
 class EvalResult(BaseModel):
+    """Stored score payload for one eval item and one model run."""
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     run_id: str = Field(...)

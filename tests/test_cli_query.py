@@ -90,6 +90,23 @@ def test_query_writes_session_artifacts_on_success(
 
 @patch("gh_search.cli._resolve_llm")
 @patch("gh_search.cli.GitHubClient")
+def test_query_defaults_to_gpt_4_1_mini_when_model_flag_is_omitted(
+    mock_github_cls, mock_resolve_llm, monkeypatch, tmp_path
+):
+    _setup_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("GH_SEARCH_MODEL", "claude-sonnet-4")
+    mock_resolve_llm.return_value = _binding(_SUPPORTED, _PARSE_OK)
+    gh = MagicMock()
+    gh.search_repositories.return_value = []
+    mock_github_cls.return_value = gh
+
+    main(["query", "python logistics 100+ stars"])
+
+    assert mock_resolve_llm.call_args.args[1] == "gpt-4.1-mini"
+
+
+@patch("gh_search.cli._resolve_llm")
+@patch("gh_search.cli.GitHubClient")
 def test_query_rejects_unsupported_intent(
     mock_github_cls, mock_resolve_llm, monkeypatch, tmp_path, capsys
 ):
