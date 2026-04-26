@@ -46,6 +46,7 @@ def score_item(
     actual_outcome: str,
     actual_terminate_reason: str | None,
 ) -> ScoreResult:
+    """Score one eval item using exact-match rules for normal and rejected cases."""
     if eval_item.get("expect_rejection", False):
         mismatches: list[str] = []
         if actual_outcome not in REJECTED_OUTCOMES:
@@ -100,6 +101,7 @@ def score_item(
 
 
 def _compare(gt: StructuredQuery, pred: StructuredQuery) -> tuple[dict[str, bool], list[str]]:
+    """Compare each `StructuredQuery` field and collect mismatch reasons."""
     results: dict[str, bool] = {}
     mismatches: list[str] = []
 
@@ -140,12 +142,14 @@ def _compare(gt: StructuredQuery, pred: StructuredQuery) -> tuple[dict[str, bool
 
 
 def _eq_case_insensitive(a: str | None, b: str | None) -> bool:
+    """Compare nullable strings case-insensitively."""
     if a is None or b is None:
         return a is None and b is None
     return a.lower() == b.lower()
 
 
 def _enum_eq(a, b) -> bool:
+    """Compare enum-like values by `.value` when present."""
     av = a.value if hasattr(a, "value") else a
     bv = b.value if hasattr(b, "value") else b
     return av == bv

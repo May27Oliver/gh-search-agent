@@ -133,22 +133,23 @@ def test_llm_response_schema_matches_structured_query_shape():
     }.issubset(required)
 
 
-# ITER5_DATE_TUNING_SPEC §8.1: today injection contract.
+# ITER5_DATE_TUNING_SPEC §8.1: reference-date injection contract.
 # Parser needs Today: YYYY-MM-DD anchor for relative date rules (last year, this year).
-# Eval path passes DATASET_TODAY_ANCHOR; production path falls back to date.today().
+# Eval path passes the dataset metadata `reference_date`; production path falls
+# back to date.today().
 
 
-def test_parse_query_prefixes_today_iso_to_user_message():
+def test_parse_query_prefixes_reference_date_iso_to_user_message():
     llm, captured = _stub_llm(_VALID_LLM_OUTPUT)
     state = _post_intent_state("find python repos from last year")
 
-    parse_query(state, llm=llm, today=date(2026, 4, 23))
+    parse_query(state, llm=llm, reference_date=date(2026, 4, 23))
 
     assert captured["user_message"].startswith("Today: 2026-04-23\n\n")
     assert "find python repos from last year" in captured["user_message"]
 
 
-def test_parse_query_today_defaults_to_system_date_when_not_provided():
+def test_parse_query_reference_date_defaults_to_system_date_when_not_provided():
     llm, captured = _stub_llm(_VALID_LLM_OUTPUT)
     state = _post_intent_state("whatever query")
 
@@ -158,12 +159,12 @@ def test_parse_query_today_defaults_to_system_date_when_not_provided():
     assert "whatever query" in captured["user_message"]
 
 
-def test_parse_query_today_injection_does_not_leak_into_system_prompt():
-    # ITER5 spec §7.1.1: today anchor goes to user_message prefix only,
+def test_parse_query_reference_date_does_not_leak_into_system_prompt():
+    # ITER5 spec §7.1.1: reference-date anchor goes to user_message prefix only,
     # so core + appendix prompt files remain pure static.
     llm, captured = _stub_llm(_VALID_LLM_OUTPUT)
     state = _post_intent_state()
 
-    parse_query(state, llm=llm, today=date(2026, 4, 23))
+    parse_query(state, llm=llm, reference_date=date(2026, 4, 23))
 
     assert "Today: 2026-04-23" not in captured["system_prompt"]

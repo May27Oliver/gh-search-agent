@@ -253,11 +253,13 @@ GH_SEARCH_LOG_ROOT=artifacts/logs
 
 - `OPENAI_API_KEY`：OpenAI provider
 - `ANTHROPIC_API_KEY`：Claude provider
-- `DEEPSEEK_API_KEY`：DeepSeek provider；`DeepSeek-R1` 會在程式內對應到實際呼叫 id `deepseek-reasoner`
+- `DEEPSEEK_API_KEY`：DeepSeek provider；canonical model name 是 `deepseek-r1`，實際呼叫 id 仍會對應到 `deepseek-reasoner`
 - `GITHUB_TOKEN`：GitHub Search API token
-- `GH_SEARCH_MODEL`：預設模型
+- `GH_SEARCH_MODEL`：提供需要 config 預設模型的命令使用；`gh-search query` 若沒帶 `--model`，固定使用 `gpt-4.1-mini`
 - `GH_SEARCH_MAX_TURNS`：agent loop 最大輪數
 - `GH_SEARCH_LOG_ROOT`：session logs 路徑
+
+目前只 tune / support 這三個 model name：`gpt-4.1-mini`、`claude-sonnet-4`、`deepseek-r1`。請直接用這三個 canonical 名稱，不要用舊 alias。
 
 ## 使用方式
 
@@ -273,12 +275,14 @@ gh-search check
 gh-search query "find the top 5 Python repositories about AI sorted by stars descending"
 ```
 
+不帶 `--model` 時，`query` 會固定使用 `gpt-4.1-mini`。
+
 也可指定模型：
 
 ```bash
 gh-search query "..." --model gpt-4.1-mini
 gh-search query "..." --model claude-sonnet-4
-gh-search query "..." --model DeepSeek-R1
+gh-search query "..." --model deepseek-r1
 ```
 
 ### 跑 smoke eval
@@ -287,10 +291,24 @@ gh-search query "..." --model DeepSeek-R1
 gh-search smoke
 ```
 
-或指定 run id：
+不帶 `--eval-run-id` 時，`smoke` 會自動使用 `model_name + UTC timestamp`，例如 `gpt-4.1-mini_20260425T010203Z`。
+
+跟 `query` 一樣，可以用 `--model` 切換要評測的模型：
 
 ```bash
-gh-search smoke --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_local_demo
+gh-search smoke --model gpt-4.1-mini
+gh-search smoke --model claude-sonnet-4
+gh-search smoke --model deepseek-r1
+```
+
+不帶 `--model` 時會讀取 `GH_SEARCH_MODEL` 環境變數作為預設模型。
+
+也可以自己指定 dataset 跟 run id（例如要重跑完整 30 題 reviewed dataset）：
+
+```bash
+gh-search smoke --model gpt-4.1-mini    --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_gpt41mini_local
+gh-search smoke --model claude-sonnet-4 --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_claude_sonnet4_local
+gh-search smoke --model deepseek-r1     --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_deepseek_r1_local
 ```
 
 ## 測試

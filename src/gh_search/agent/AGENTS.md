@@ -17,6 +17,12 @@
   5. 每輪結束都會寫 `TurnLog`，也會輸出一份 artifact（`turn_NN_<tool>.json`）。
   6. 如果 `state.control.should_terminate` 已經是 `True`，或回合數超過 `max_turns`，流程就結束。
 
+如果你是第一次實際打開 `loop.py`，建議不是一路從第 1 行看到最後，而是用這個順序：
+
+1. 先看 `run_agent_loop()`，把「每回合做什麼」抓出來。
+2. 接著看 `_dispatch()`，因為它直接回答「有哪些 tool、誰會被叫到」。
+3. 再看 `_turn_log()` 和 `_artifact_payload()`，理解為什麼這個 repo debug 起來比一般 take-home 題容易。
+
 ## 這個切法的用意
 
 - **loop 只負責流程控制**。它只決定「現在該跑哪一步」，不負責判斷 query 合不合法、GitHub 查詢字串怎麼組，這些規則都在 tool 叫到的 domain service。

@@ -17,7 +17,7 @@
 ## 這裡有幾個一定要知道的規矩
 
 - **全部都是 immutable**。pydantic model 全開 `ConfigDict(extra="forbid", frozen=True)`：不能加沒定義過的欄位、也不能改已有欄位的值。要變更請用 `model_copy(update={...})`，拿到的是一份新物件，原本那份不會動。這是為了讓 agent loop 能安全地比較前後 state 的差異。
-- **`StructuredQuery` 本身有驗證器**：日期必須 `created_after <= created_before`，而 `sort` 跟 `order` 要嘛都指定、要嘛都是 `None`，不能只填一個。寫測試時這些邊界值要特別留意。
+- **`StructuredQuery` 本身只做 schema 級驗證**：日期格式必須是 `YYYY-MM-DD`，而 `sort` 跟 `order` 要嘛都指定、要嘛都是 `None`，不能只填一個。像 `created_after <= created_before`、`min_stars <= max_stars` 這種跨欄位語意規則，不在 schema 裡，而是在 `validator.py`。
 - **所有 enum 都用 `str` 當基底**，這樣序列化成 JSON 寫 log 時可以直接用，不用特別處理。
 - **「還沒解析出來」狀態請用 `None`，不要用空 dict `{}`**。之前踩過坑：用 `{}` 時，後面的程式會以為「已經解析了但結果是空的」，分不出來。
 
@@ -27,3 +27,5 @@
 2. 把用到它的 tool、compiler、validator 都同步更新。
 3. 補上對應的測試：`tests/test_schemas_*.py` 加欄位層級的檢查，再加上受影響的 tool 測試。
 4. **絕對不要**在別的地方又宣告一份「幾乎一樣但略有不同的 dict」。如果你發現類似的東西，請直接合併回這個資料夾。
+
+如果你是為了快速講解 repo 才來看這裡，建議每個 schema 檔都先找 docstring，再看欄位本身。這一輪我已經把主要 model 的用途補成一句話，所以讀起來會比直接掃 `Field(...)` 容易很多。

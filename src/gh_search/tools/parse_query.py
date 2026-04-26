@@ -1,8 +1,8 @@
 """parse_query tool (TOOLS.md §3 parse_query).
 
 Ask the LLM to turn the user's natural-language request into a StructuredQuery.
-The system prompt is composed at call time from `prompts/core/parse-v1.md`
-plus the per-model appendix (`prompts/appendix/parse-<model>-v1.md`) so that
+The system prompt is composed at call time from `prompts/core/parse.md`
+plus the per-model appendix (`prompts/appendix/parse-<model>.md`) so that
 PHASE2_PLAN §1.1's "prompt / few-shot / gate wording must stay isolated as
 model-specific appendix" is actually enforced at runtime — not just claimed
 by a `prompt_version` label (PHASE2_PLAN §3.0).
@@ -12,10 +12,10 @@ state.control.next_tool. It never sets terminate flags; validate_query owns
 that decision.
 
 ITER5_DATE_TUNING_SPEC §7.1.1: the user_message is prefixed with a
-`Today: YYYY-MM-DD` anchor line so relative-date rules in parse-v1.md
+`Today: YYYY-MM-DD` anchor line so relative-date rules in parse.md
 (last year / this year / 今年 / 去年) can resolve against a concrete date.
-Eval path pins the anchor to `DATASET_TODAY_ANCHOR`; production CLI path
-omits the kwarg so it falls back to `date.today()`.
+Eval path can pin the anchor from dataset metadata; production CLI path omits
+the kwarg so it falls back to `date.today()`.
 """
 from __future__ import annotations
 
@@ -61,11 +61,12 @@ def parse_query(
     state: SharedAgentState,
     llm: LLMJsonCall,
     *,
-    today: date | None = None,
+    reference_date: date | None = None,
 ) -> SharedAgentState:
+    """Ask the LLM for a `StructuredQuery` and hand off to validation."""
     system_prompt = compose_system_for(PROMPT_NAME, llm)
-    today_iso = (today or date.today()).isoformat()
-    user_message = f"Today: {today_iso}\n\n{state.user_query}"
+    reference_date_iso = (reference_date or date.today()).isoformat()
+    user_message = f"Today: {reference_date_iso}\n\n{state.user_query}"
     response = llm(system_prompt, user_message, RESPONSE_SCHEMA)
     try:
         sq = StructuredQuery.model_validate(response.parsed)

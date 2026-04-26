@@ -8,7 +8,7 @@
 
 全部東西都在 [`client.py`](./client.py) 裡，而且只有三樣：
 
-1. **`Repository`** — 一個 frozen dataclass，代表一筆搜尋結果。只有四個欄位：`name`、`url`、`stars`、`language`。
+1. **`Repository`** — 一個 frozen dataclass，代表一筆搜尋結果。主要欄位是 `name`、`url`、`stars`、`language`，另外還保留 `description` 方便之後做 retrieval artifact 或 CLI 顯示。
 2. **`GitHubClient.search_repositories(q, sort, order, per_page)`** — 同步 HTTP 呼叫，成功時回傳 `list[Repository]`。
 3. **一組自定義例外** — `GitHubError` 是 base，底下有四種具體例外，分別對應到 GitHub 四種典型的失敗狀況（見下一節）。
 
@@ -20,12 +20,12 @@
 |---|---|---|
 | 401 Unauthorized | `GitHubAuthError` | token 沒帶或是錯的，檢查 `GITHUB_TOKEN`。 |
 | 422 Unprocessable | `GitHubInvalidQueryError` | 查詢字串 GitHub 不接受，通常是 compiler 組錯了。 |
-| 403 且 `X-RateLimit-Remaining: 0` | `GitHubRateLimitError` | 被 GitHub 限流，要等一下再試。 |
+| 403 且看起來是 rate limit | `GitHubRateLimitError` | 被 GitHub 限流，要等一下再試。client 會先看 `X-RateLimit-Remaining`，必要時再看 response body 的訊息。 |
 | 連線錯誤 / timeout / 其他非 2xx | `GitHubTransportError` | 網路層問題，不屬於上面那三種。 |
 
 ## 測試
 
-`tests/test_github_client.py` 用 `responses` 這個套件把 HTTP 假掉，每一種錯誤狀況都有對應的測試。**改 client 行為之前請先改測試**（TDD 的習慣），不然很容易動到一種錯誤卻忘了另一種。
+`tests/test_github_client.py` 用 `responses` 這個套件把 HTTP 假掉，每一種錯誤狀況都有對應的測試。**改 client 行為之前請先改測試**（TDD 的習慣），不然很容易動到一種錯誤卻忘了另一種。實際讀 code 時，建議順序是：`search_repositories()` → `_normalize()` → `_is_rate_limited()`。
 
 ## 這裡刻意**不做**的事
 

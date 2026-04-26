@@ -7,7 +7,7 @@ label that didn't describe what the model actually saw.
 
 These tests lock the wiring in place:
 
-1. The system prompt the LLM receives matches `prompts/core/<tool>-v1.md`.
+1. The system prompt the LLM receives matches `prompts/core/<tool>.md`.
 2. Per-model appendix content flows through to the LLM (via model_name on
    the adapter closure).
 3. `_record_llm` preserves `.model_name` so tools can compose mid-session.
@@ -103,7 +103,7 @@ def test_parse_query_uses_core_prompt_file_content():
     assert sink["system_prompt"] == expected
     # Sanity: the prompt actually contains the rule text from the file, not
     # whatever was hard-coded in an old inline string.
-    file_text = (DEFAULT_PROMPTS_ROOT / "core" / "parse-v1.md").read_text(encoding="utf-8")
+    file_text = (DEFAULT_PROMPTS_ROOT / "core" / "parse.md").read_text(encoding="utf-8")
     assert "keywords" in sink["system_prompt"]
     assert sink["system_prompt"].strip() == file_text.strip()  # empty appendix
 
@@ -150,8 +150,8 @@ def test_appendix_content_reaches_llm_when_present(tmp_path: Path, monkeypatch):
     scratch = tmp_path / "prompts"
     (scratch / "core").mkdir(parents=True)
     (scratch / "appendix").mkdir(parents=True)
-    (scratch / "core" / "parse-v1.md").write_text("CORE_TEXT", encoding="utf-8")
-    (scratch / "appendix" / "parse-gpt-4.1-mini-v1.md").write_text(
+    (scratch / "core" / "parse.md").write_text("CORE_TEXT", encoding="utf-8")
+    (scratch / "appendix" / "parse-gpt-4.1-mini.md").write_text(
         "APPENDIX_INJECTED_MARKER", encoding="utf-8"
     )
 

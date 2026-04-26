@@ -14,9 +14,9 @@ def _seed(prompts_root: Path, *, core: str, appendix: str | None = None,
     app_dir = prompts_root / "appendix"
     core_dir.mkdir(parents=True, exist_ok=True)
     app_dir.mkdir(parents=True, exist_ok=True)
-    (core_dir / f"{name}-v1.md").write_text(core, encoding="utf-8")
+    (core_dir / f"{name}.md").write_text(core, encoding="utf-8")
     if appendix is not None:
-        (app_dir / f"{name}-{model}-v1.md").write_text(appendix, encoding="utf-8")
+        (app_dir / f"{name}-{model}.md").write_text(appendix, encoding="utf-8")
 
 
 def test_load_prompt_bundle_core_only(tmp_path: Path):
@@ -24,7 +24,7 @@ def test_load_prompt_bundle_core_only(tmp_path: Path):
     b = load_prompt_bundle("parse", "test-model", prompts_root=tmp_path)
     assert b.core_text == "CORE"
     assert b.appendix_text is None
-    assert b.prompt_version == "core-v1 + appendix-test-model-v1"
+    assert b.prompt_version == "core + appendix-test-model"
 
 
 def test_load_prompt_bundle_with_appendix(tmp_path: Path):
@@ -56,4 +56,4 @@ def test_real_prompts_directory_contains_phase2_baseline():
     for model in ("gpt-4.1-mini", "claude-sonnet-4", "deepseek-r1"):
         b = load_prompt_bundle("parse", model)
         assert b.core_text.strip()  # non-empty
-        assert b.prompt_version == f"core-v1 + appendix-{model}-v1"
+        assert b.prompt_version == f"core + appendix-{model}"

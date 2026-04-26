@@ -25,7 +25,6 @@ _ENV_NAMES: dict[str, str] = {
     "deepseek_api_key": "DEEPSEEK_API_KEY",
     "deepseek_endpoint": "DEEPSEEK_ENDPOINT",
     "github_token": "GITHUB_TOKEN",
-    "provider_override": "GH_SEARCH_PROVIDER",
 }
 
 
@@ -37,7 +36,6 @@ class Config:
     deepseek_endpoint: str | None
     github_token: str | None
     model: str
-    provider_override: str | None
     max_turns: int
     log_root: Path
 
@@ -71,7 +69,6 @@ def load_config(env_file: Path | None = None) -> Config:
         deepseek_endpoint=os.getenv("DEEPSEEK_ENDPOINT") or None,
         github_token=os.getenv("GITHUB_TOKEN") or None,
         model=os.getenv("GH_SEARCH_MODEL", "gpt-4.1-mini"),
-        provider_override=os.getenv("GH_SEARCH_PROVIDER") or None,
         max_turns=max_turns,
         log_root=Path(os.getenv("GH_SEARCH_LOG_ROOT", "artifacts/logs")),
     )
