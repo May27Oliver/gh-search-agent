@@ -293,10 +293,22 @@ gh-search smoke
 
 不帶 `--eval-run-id` 時，`smoke` 會自動使用 `model_name + UTC timestamp`，例如 `gpt-4.1-mini_20260425T010203Z`。
 
-也可以自己指定 run id：
+跟 `query` 一樣，可以用 `--model` 切換要評測的模型：
 
 ```bash
-gh-search smoke --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_local_demo
+gh-search smoke --model gpt-4.1-mini
+gh-search smoke --model claude-sonnet-4
+gh-search smoke --model deepseek-r1
+```
+
+不帶 `--model` 時會讀取 `GH_SEARCH_MODEL` 環境變數作為預設模型。
+
+也可以自己指定 dataset 跟 run id（例如要重跑完整 30 題 reviewed dataset）：
+
+```bash
+gh-search smoke --model gpt-4.1-mini    --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_gpt41mini_local
+gh-search smoke --model claude-sonnet-4 --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_claude_sonnet4_local
+gh-search smoke --model deepseek-r1     --dataset datasets/eval_dataset_reviewed.json --eval-run-id eval_deepseek_r1_local
 ```
 
 ## 測試
