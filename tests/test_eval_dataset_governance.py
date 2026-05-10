@@ -1,4 +1,4 @@
-"""Eval dataset bucket governance (SEMANTIC_PARSING_HARNESS_PR_PLAN PR1).
+"""Eval dataset bucket governance.
 
 Source-driven equality between qid manifests and the reviewed dataset:
 
@@ -18,12 +18,9 @@ Plus three structural invariants:
   past all three equality tests)
 
 These tests deliberately do not name any qid string; the membership of each
-bucket is derived from the source dataset's review fields. Adding a fifth
+bucket is derived from the source dataset's review fields. Adding a new
 unstable question requires only updating the source's review_status — the
 manifests and these tests catch the rest.
-
-PR1 also does not touch the runner / scorer; the cutover is PR2 (Eval
-Bucket Plumbing).
 """
 from __future__ import annotations
 
@@ -181,3 +178,102 @@ def test_all_manifest_qids_resolve(
 ) -> None:
     for qid in (*formal_qids, *ambiguous_qids, *failure_qids):
         assert qid in reviewed_index, f"{qid} is not present in reviewed dataset"
+
+
+def test_runner_resolves_every_reviewed_qid_to_a_unique_bucket(
+    reviewed_index: dict[str, dict],
+) -> None:
+    """The runner's manifest loader must cover every qid in the reviewed dataset.
+
+    Without this guard, a qid that exists in source but not in any manifest would
+    silently default to ``formal_eval`` inside the runner, polluting headline
+    accuracy. The qid-equality tests above already pin this from the manifest
+    side; this check pins it from the runner side so the loader cannot diverge.
+    """
+    from gh_search.eval.runner import _load_bucket_index
+
+    bucket_index, _declared = _load_bucket_index(REPO_ROOT / "datasets")
+    missing = [qid for qid in reviewed_index if qid not in bucket_index]
+    assert not missing, (
+        f"every qid in the reviewed dataset must be assigned to a manifest "
+        f"bucket; runner-side loader did not find: {sorted(missing)}"
+    )
+
+
+# Strict-mode loader — malformed manifests must fail fast rather than fall
+# back to ``formal_eval``, otherwise broken governance silently pollutes
+# headline accuracy.
+
+
+def test_load_bucket_index_raises_on_non_object_payload(tmp_path: Path) -> None:
+    bad = tmp_path / "broken_qids.json"
+    bad.write_text(json.dumps(["not", "an", "object"]))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        _load_bucket_index(tmp_path)
+
+
+def test_load_bucket_index_raises_when_bucket_field_is_not_string(tmp_path: Path) -> None:
+    bad = tmp_path / "broken_qids.json"
+    bad.write_text(json.dumps({"bucket": 42, "qids": []}))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    with pytest.raises(ValueError, match="invalid 'bucket' field"):
+        _load_bucket_index(tmp_path)
+
+
+def test_load_bucket_index_raises_when_qids_field_is_missing(tmp_path: Path) -> None:
+    bad = tmp_path / "broken_qids.json"
+    bad.write_text(json.dumps({"bucket": "formal_eval"}))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    with pytest.raises(ValueError, match="invalid 'qids' field"):
+        _load_bucket_index(tmp_path)
+
+
+def test_load_bucket_index_raises_when_qids_field_is_not_list(tmp_path: Path) -> None:
+    bad = tmp_path / "broken_qids.json"
+    bad.write_text(json.dumps({"bucket": "formal_eval", "qids": "q001,q002"}))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    with pytest.raises(ValueError, match="invalid 'qids' field"):
+        _load_bucket_index(tmp_path)
+
+
+def test_load_bucket_index_raises_on_conflicting_qid_assignments(tmp_path: Path) -> None:
+    (tmp_path / "a_qids.json").write_text(json.dumps({
+        "bucket": "formal_eval", "qids": ["q001"],
+    }))
+    (tmp_path / "b_qids.json").write_text(json.dumps({
+        "bucket": "failure_case_eval", "qids": ["q001"],
+    }))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    with pytest.raises(ValueError, match="multiple manifests"):
+        _load_bucket_index(tmp_path)
+
+
+def test_load_bucket_index_returns_declared_buckets_including_empty_ones(
+    tmp_path: Path,
+) -> None:
+    """A manifest declaring a bucket with zero qids must still surface that
+    bucket name in `declared_buckets` — that is what lets the runner emit a
+    0/0 entry for it instead of dropping the bucket from the breakdown."""
+    (tmp_path / "formal_eval_qids.json").write_text(json.dumps({
+        "bucket": "formal_eval", "qids": ["q001"],
+    }))
+    (tmp_path / "ambiguous_eval_qids.json").write_text(json.dumps({
+        "bucket": "ambiguous_or_unexpressible_eval", "qids": [],
+    }))
+
+    from gh_search.eval.runner import _load_bucket_index
+
+    qid_to_bucket, declared = _load_bucket_index(tmp_path)
+    assert qid_to_bucket == {"q001": "formal_eval"}
+    assert declared == frozenset({"formal_eval", "ambiguous_or_unexpressible_eval"})

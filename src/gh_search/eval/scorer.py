@@ -35,6 +35,7 @@ class ScoreResult:
     is_correct: bool
     score: float
     score_type: str
+    bucket: str = "formal_eval"
     field_results: dict[str, bool] = field(default_factory=dict)
     mismatch_reasons: list[str] = field(default_factory=list)
     terminate_reason: str | None = None
@@ -47,6 +48,8 @@ def score_item(
     actual_terminate_reason: str | None,
 ) -> ScoreResult:
     """Score one eval item using exact-match rules for normal and rejected cases."""
+    bucket = eval_item.get("bucket", "formal_eval")
+
     if eval_item.get("expect_rejection", False):
         mismatches: list[str] = []
         if actual_outcome not in REJECTED_OUTCOMES:
@@ -62,6 +65,7 @@ def score_item(
             is_correct=ok,
             score=1.0 if ok else 0.0,
             score_type="rejected_exact_match",
+            bucket=bucket,
             field_results={},
             mismatch_reasons=mismatches,
             terminate_reason=actual_terminate_reason,
@@ -73,6 +77,7 @@ def score_item(
             is_correct=False,
             score=0.0,
             score_type="normalized_exact_match",
+            bucket=bucket,
             mismatch_reasons=["ground_truth_structured_query is null"],
             terminate_reason=actual_terminate_reason,
         )
@@ -83,6 +88,7 @@ def score_item(
             is_correct=False,
             score=0.0,
             score_type="normalized_exact_match",
+            bucket=bucket,
             field_results={f: False for f in _FIELDS},
             mismatch_reasons=["predicted_structured_query is null"],
             terminate_reason=actual_terminate_reason,
@@ -94,6 +100,7 @@ def score_item(
         is_correct=is_correct,
         score=1.0 if is_correct else 0.0,
         score_type="normalized_exact_match",
+        bucket=bucket,
         field_results=field_results,
         mismatch_reasons=mismatches,
         terminate_reason=actual_terminate_reason,

@@ -34,23 +34,66 @@ from gh_search.schemas import (
 )
 
 
+HEADLINE_BUCKET = "formal_eval"
+
+
+@dataclass(frozen=True)
+class BucketStats:
+    """單一 bucket 的成績統計（不可變）。
+
+    為什麼要把單一 bucket 的成績單獨存起來：
+    一份 eval 跑完之後，30 題會分散在不同 bucket（例如 `formal_eval`、
+    `failure_case_eval`、`ambiguous_or_unexpressible_eval`）。每個 bucket
+    本來就要用不同方式打分、不同方式報告：
+
+    - `formal_eval`：算進 headline accuracy 的主分數
+    - `failure_case_eval`：已知壞掉的題，**跑、紀錄，但不算 headline**
+    - `ambiguous_or_unexpressible_eval`：保守處理是否正確，未來改 outcome-based
+
+    如果只用一組 (total, correct, accuracy) 把所有題目加總起來，不穩定的題
+    （例如語意無法被 schema 表達、或 reviewer 也標不出 ground truth 的題）
+    會把分數拉低，但**外人看不出是模型差還是題目壞**。把每個 bucket 各自存
+    一份 `BucketStats`，再交給 `SmokeSummary` 聚成 `headline_*`（只算
+    formal）和 `processed_*`（全部 bucket）兩套，就能把這兩件事拆開看。
+
+    這個 dataclass 只是「**一個 bucket 的成績**」的容器，沒有方法、沒有
+    狀態 — frozen 確保它在 summary 構造完之後不會被誰偷改。
+    """
+
+    total: int
+    correct: int
+    accuracy: float
+
+
 @dataclass(frozen=True)
 class SmokeSummary:
     eval_run_id: str
     model_name: str
     provider_name: str
-    total: int
-    correct: int
-    accuracy: float
+    processed_total: int
+    processed_correct: int
+    processed_accuracy: float
+    headline_total: int
+    headline_correct: int
+    headline_accuracy: float
     outcome_counts: dict[str, int]
+    bucket_breakdown: dict[str, BucketStats]
 
 
 @dataclass(frozen=True)
 class EvalDataset:
-    """Dataset payload plus optional metadata shared across every eval item."""
+    """Dataset payload plus optional metadata shared across every eval item.
+
+    `declared_buckets` is the universe of bucket names declared by the
+    sibling `*_qids.json` manifests, *including buckets whose qid list is
+    empty*. Carrying this lets the runner pre-populate `bucket_breakdown`
+    with 0/0 entries for declared-but-unused buckets, so downstream
+    consumers never have to distinguish "missing key" from "no items".
+    """
 
     items: list[dict]
     reference_date: date | None = None
+    declared_buckets: frozenset[str] = frozenset()
 
 
 def run_smoke_eval(
@@ -92,7 +135,7 @@ def run_smoke_eval(
     per_item_json_path = run_dir / "per_item_results.json"
 
     outcome_counts: dict[str, int] = {}
-    correct_count = 0
+    bucket_totals: dict[str, list[int]] = {}
     per_item_entries: list[dict] = []
 
     with per_item_path.open("a", encoding="utf-8") as per_item_fp:
@@ -137,8 +180,10 @@ def run_smoke_eval(
                     else None
                 ),
             )
+            stats = bucket_totals.setdefault(score.bucket, [0, 0])
+            stats[0] += 1
             if score.is_correct:
-                correct_count += 1
+                stats[1] += 1
 
             _write_session_finalization(
                 session_logger=session_logger,
@@ -175,16 +220,44 @@ def run_smoke_eval(
 
     per_item_json_path.write_text(json.dumps(per_item_entries, indent=2))
 
-    total = len(dataset.items)
-    accuracy = correct_count / total if total else 0.0
+    # Pre-populate every bucket the manifests declare (even with zero qids), so
+    # downstream consumers don't have to disambiguate "missing key" from
+    # "0 items". HEADLINE_BUCKET is always present so headline_* is always
+    # well-defined; defensively also include any bucket that items actually
+    # landed in (which should already be a subset of declared_buckets).
+    all_bucket_names = (
+        dataset.declared_buckets
+        | {HEADLINE_BUCKET}
+        | set(bucket_totals.keys())
+    )
+    bucket_breakdown: dict[str, BucketStats] = {}
+    for name in sorted(all_bucket_names):
+        if name in bucket_totals:
+            t, c = bucket_totals[name]
+            bucket_breakdown[name] = BucketStats(
+                total=t, correct=c, accuracy=(c / t if t else 0.0)
+            )
+        else:
+            bucket_breakdown[name] = BucketStats(total=0, correct=0, accuracy=0.0)
+    processed_total = sum(stats.total for stats in bucket_breakdown.values())
+    processed_correct = sum(stats.correct for stats in bucket_breakdown.values())
+    processed_accuracy = processed_correct / processed_total if processed_total else 0.0
+    headline = bucket_breakdown.get(
+        HEADLINE_BUCKET, BucketStats(total=0, correct=0, accuracy=0.0)
+    )
+
     summary = SmokeSummary(
         eval_run_id=eval_run_id,
         model_name=model_name,
-        total=total,
-        correct=correct_count,
-        accuracy=accuracy,
-        outcome_counts=outcome_counts,
         provider_name=provider_name,
+        processed_total=processed_total,
+        processed_correct=processed_correct,
+        processed_accuracy=processed_accuracy,
+        headline_total=headline.total,
+        headline_correct=headline.correct,
+        headline_accuracy=headline.accuracy,
+        outcome_counts=outcome_counts,
+        bucket_breakdown=bucket_breakdown,
     )
 
     (run_dir / "model_summary.json").write_text(
@@ -193,10 +266,28 @@ def run_smoke_eval(
                 "eval_run_id": eval_run_id,
                 "model_name": model_name,
                 "provider_name": provider_name,
-                "total": total,
-                "correct": correct_count,
-                "accuracy": accuracy,
+                # legacy aliases — kept so build_model_matrix.py and other
+                # downstream consumers keep working without changes
+                "total": processed_total,
+                "correct": processed_correct,
+                "accuracy": processed_accuracy,
+                # explicit "what we ran" — across every bucket
+                "processed_total": processed_total,
+                "processed_correct": processed_correct,
+                "processed_accuracy": processed_accuracy,
+                # explicit "headline accuracy" — formal_eval bucket only
+                "headline_total": headline.total,
+                "headline_correct": headline.correct,
+                "headline_accuracy": headline.accuracy,
                 "outcome_counts": outcome_counts,
+                "bucket_breakdown": {
+                    name: {
+                        "total": stats.total,
+                        "correct": stats.correct,
+                        "accuracy": stats.accuracy,
+                    }
+                    for name, stats in bucket_breakdown.items()
+                },
             },
             indent=2,
         )
@@ -233,8 +324,72 @@ def _write_run_config(
     )
 
 
-def _load_eval_dataset(dataset_path: Path) -> EvalDataset:
-    """Load eval dataset items plus optional file-level metadata."""
+def _load_bucket_index(
+    manifests_dir: Path,
+) -> tuple[dict[str, str], frozenset[str]]:
+    """Read every `*_qids.json` manifest in a directory.
+
+    Returns ``(qid_to_bucket, declared_buckets)``:
+
+    - ``qid_to_bucket``: mapping from qid to the bucket name that owns it
+    - ``declared_buckets``: every bucket name declared by any manifest in
+      this directory, **including buckets whose qid list is empty**
+
+    Manifests are the single source of truth for which bucket a qid lives in.
+    Three classes of error must surface immediately rather than silently
+    fall back to ``formal_eval`` (which would pollute headline accuracy):
+
+    1. malformed manifest payload (not a JSON object)
+    2. ``bucket`` field missing or not a string
+    3. ``qids`` field missing or not a list
+    4. the same qid declared by two manifests with conflicting buckets
+    """
+    qid_to_bucket: dict[str, str] = {}
+    declared_buckets: set[str] = set()
+    if not manifests_dir.exists():
+        return qid_to_bucket, frozenset(declared_buckets)
+    for path in sorted(manifests_dir.glob("*_qids.json")):
+        with path.open(encoding="utf-8") as f:
+            payload = json.load(f)
+        if not isinstance(payload, dict):
+            raise ValueError(
+                f"manifest {path} must be a JSON object, "
+                f"got {type(payload).__name__}"
+            )
+        bucket = payload.get("bucket")
+        if not isinstance(bucket, str):
+            raise ValueError(
+                f"manifest {path} has invalid 'bucket' field: expected str, "
+                f"got {type(bucket).__name__}"
+            )
+        qids = payload.get("qids")
+        if not isinstance(qids, list):
+            raise ValueError(
+                f"manifest {path} has invalid 'qids' field: expected list, "
+                f"got {type(qids).__name__}"
+            )
+        declared_buckets.add(bucket)
+        for qid in qids:
+            if qid in qid_to_bucket and qid_to_bucket[qid] != bucket:
+                raise ValueError(
+                    f"qid {qid!r} appears in multiple manifests with conflicting "
+                    f"buckets: {qid_to_bucket[qid]!r} and {bucket!r}"
+                )
+            qid_to_bucket[qid] = bucket
+    return qid_to_bucket, frozenset(declared_buckets)
+
+
+def _load_eval_dataset(
+    dataset_path: Path,
+    manifests_dir: Path | None = None,
+) -> EvalDataset:
+    """Load eval dataset items plus optional file-level metadata.
+
+    Each item dict is augmented with a ``bucket`` key sourced from qid manifests
+    in ``manifests_dir`` (defaults to ``dataset_path.parent``). Items whose qid
+    is not in any manifest fall back to ``formal_eval`` so smoke / ad-hoc
+    datasets keep their original headline semantics.
+    """
     raw = json.loads(Path(dataset_path).read_text())
     if not isinstance(raw, dict):
         raise ValueError(
@@ -255,7 +410,19 @@ def _load_eval_dataset(dataset_path: Path) -> EvalDataset:
         if isinstance(reference_date_raw, str) and reference_date_raw
         else None
     )
-    return EvalDataset(items=items, reference_date=reference_date)
+
+    if manifests_dir is None:
+        manifests_dir = Path(dataset_path).parent
+    qid_to_bucket, declared_buckets = _load_bucket_index(manifests_dir)
+    items_with_bucket = [
+        {**item, "bucket": qid_to_bucket.get(item.get("id"), HEADLINE_BUCKET)}
+        for item in items
+    ]
+    return EvalDataset(
+        items=items_with_bucket,
+        reference_date=reference_date,
+        declared_buckets=declared_buckets,
+    )
 
 
 def _per_item_entry(
@@ -282,6 +449,7 @@ def _per_item_entry(
     return {
         "eval_run_id": eval_run_id,
         "eval_item_id": item["id"],
+        "bucket": item.get("bucket", HEADLINE_BUCKET),
         "model_name": model_name,
         "provider_name": provider_name,
         "run_id": run_id,
@@ -366,6 +534,7 @@ def _write_session_finalization(
         score=score.score,
         is_correct=score.is_correct,
         created_at=_now(),
+        bucket=item.get("bucket", HEADLINE_BUCKET),
     )
     (session_logger.session_dir / "eval_result.json").write_text(
         eval_result.model_dump_json(indent=2)

@@ -203,13 +203,22 @@ def _cmd_smoke(args: argparse.Namespace) -> int:
         max_turns=cfg.max_turns,
     )
 
+    bucket_summary = ", ".join(
+        f"{name}={stats.correct}/{stats.total}"
+        for name, stats in sorted(summary.bucket_breakdown.items())
+    ) or "(none)"
     print(
-        f"[{eval_run_id}] model={summary.model_name} "
-        f"accuracy={summary.accuracy:.2%} "
-        f"correct={summary.correct}/{summary.total} "
-        f"outcomes={summary.outcome_counts}"
+        f"[{eval_run_id}] model={summary.model_name}\n"
+        f"  headline={summary.headline_correct}/{summary.headline_total}"
+        f" ({summary.headline_accuracy:.2%})  "
+        f"# formal_eval only\n"
+        f"  processed={summary.processed_correct}/{summary.processed_total}"
+        f" ({summary.processed_accuracy:.2%})  "
+        f"# all buckets\n"
+        f"  buckets: {bucket_summary}\n"
+        f"  outcomes={summary.outcome_counts}"
     )
-    return 0 if summary.correct == summary.total else 1
+    return 0 if summary.processed_correct == summary.processed_total else 1
 
 
 def _cmd_check(_: argparse.Namespace) -> int:

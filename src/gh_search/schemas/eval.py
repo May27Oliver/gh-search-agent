@@ -19,3 +19,4 @@ class EvalResult(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0)
     is_correct: bool = Field(...)
     created_at: str = Field(...)
+    bucket: str = Field(default="formal_eval")

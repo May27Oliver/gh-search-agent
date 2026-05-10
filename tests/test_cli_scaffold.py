@@ -108,10 +108,14 @@ def test_smoke_defaults_eval_run_id_to_model_plus_timestamp(
     mock_github_cls.return_value = MagicMock()
     mock_run_smoke_eval.return_value = MagicMock(
         model_name="gpt-4.1-mini",
-        accuracy=1.0,
-        correct=3,
-        total=3,
+        processed_total=3,
+        processed_correct=3,
+        processed_accuracy=1.0,
+        headline_total=3,
+        headline_correct=3,
+        headline_accuracy=1.0,
         outcome_counts={"success": 3},
+        bucket_breakdown={},
     )
 
     with patch("gh_search.cli._default_eval_run_id", return_value="gpt-4.1-mini_20260425T010203Z"):

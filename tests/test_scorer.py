@@ -170,3 +170,74 @@ def test_date_comparison_exact():
         actual_terminate_reason=None,
     )
     assert r.is_correct is True
+
+
+# Bucket plumbing — the scorer reads `eval_item["bucket"]` and propagates it
+# onto ScoreResult. Scoring logic itself does not currently differ across
+# buckets; the bucket label exists so per-bucket strategies (paraphrase
+# many-to-one, ambiguous outcome-based) can be dispatched later without
+# changing this signature.
+
+
+def test_score_result_defaults_bucket_to_formal_eval_when_item_omits_it():
+    item = _item()  # no `bucket` key — simulates ad-hoc / smoke datasets
+    r = score_item(
+        eval_item=item,
+        predicted_query=_sq(),
+        actual_outcome="success",
+        actual_terminate_reason=None,
+    )
+    assert r.bucket == "formal_eval"
+
+
+def test_score_result_propagates_explicit_bucket_from_item():
+    item = {**_item(), "bucket": "failure_case_eval"}
+    r = score_item(
+        eval_item=item,
+        predicted_query=_sq(),
+        actual_outcome="success",
+        actual_terminate_reason=None,
+    )
+    assert r.bucket == "failure_case_eval"
+
+
+def test_bucket_does_not_change_correctness_for_exact_match_scoring():
+    """Same prediction must yield the same is_correct/score regardless of bucket.
+
+    The bucket label is plumbed onto ScoreResult but does not currently change
+    the scoring logic — per-bucket strategies (paraphrase many-to-one,
+    outcome-based ambiguous) are not yet wired in.
+    """
+    formal = score_item(
+        eval_item={**_item(), "bucket": "formal_eval"},
+        predicted_query=_sq(min_stars=999),
+        actual_outcome="success",
+        actual_terminate_reason=None,
+    )
+    failure = score_item(
+        eval_item={**_item(), "bucket": "failure_case_eval"},
+        predicted_query=_sq(min_stars=999),
+        actual_outcome="success",
+        actual_terminate_reason=None,
+    )
+    assert formal.is_correct == failure.is_correct
+    assert formal.score == failure.score
+    assert formal.field_results == failure.field_results
+
+
+def test_score_result_carries_bucket_on_rejection_path():
+    item = {
+        "id": "q_reject",
+        "bucket": "ambiguous_or_unexpressible_eval",
+        "expect_rejection": True,
+        "expected_terminate_reason": "ambiguous_query",
+    }
+    r = score_item(
+        eval_item=item,
+        predicted_query=None,
+        actual_outcome="rejected",
+        actual_terminate_reason="ambiguous_query",
+    )
+    assert r.bucket == "ambiguous_or_unexpressible_eval"
+    assert r.is_correct is True
+    assert r.score_type == "rejected_exact_match"
