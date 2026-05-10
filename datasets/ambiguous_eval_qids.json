@@ -1,0 +1,7 @@
+{
+  "bucket": "ambiguous_or_unexpressible_eval",
+  "description": "Reserved bucket for questions whose current-schema mapping is unstable but whose conservative outcome is still well-defined (see SEMANTIC_PARSING_HARNESS_REFACTOR_SPEC §6.5). Empty in PR1 by design — re-annotation of the four needs_revision qids is deferred so PR1 stays a pure governance change. Populated by later PRs in SEMANTIC_PARSING_HARNESS_PR_PLAN.",
+  "source_dataset": "datasets/eval_dataset_reviewed.json",
+  "review_summary": "specs/datasets/HUMAN_REVIEW_SUMMARY.md",
+  "qids": []
+}

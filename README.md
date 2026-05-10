@@ -14,6 +14,8 @@
 
 ## 最終結果
 
+> **過渡期注記（2026-05-10 起）**：以下 accuracy 仍以 30 題計算，內含 4 題已知不穩定題（`q010` / `q020` / `q021` / `q029`，詳見 [HUMAN_REVIEW_SUMMARY.md §2026-05-10](specs/datasets/HUMAN_REVIEW_SUMMARY.md)）。`datasets/formal_eval_qids.json` 已建立但 runner 尚未接通；正式 26 題口徑要等 PR2 (Eval Bucket Plumbing) 把 manifest 接到 runner / scorer 後重跑。
+
 正式 final pipeline 對 `datasets/eval_dataset_reviewed.json`（30 題）的最終成績：
 
 | model             | provider  | deployed model id / access                                                      | final accuracy | correct |

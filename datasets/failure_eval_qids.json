@@ -1,0 +1,12 @@
+{
+  "bucket": "failure_case_eval",
+  "description": "Known failure modes preserved for retrospective. Excluded from formal headline accuracy. Each qid was originally drafted as a normal eval item but flagged needs_revision during human review; original review_notes live in datasets/eval_dataset_reviewed.json.",
+  "source_dataset": "datasets/eval_dataset_reviewed.json",
+  "review_summary": "specs/datasets/HUMAN_REVIEW_SUMMARY.md",
+  "qids": [
+    "q010",
+    "q020",
+    "q021",
+    "q029"
+  ]
+}
