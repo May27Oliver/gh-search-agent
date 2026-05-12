@@ -20,3 +20,4 @@ class EvalResult(BaseModel):
     is_correct: bool = Field(...)
     created_at: str = Field(...)
     bucket: str = Field(default="formal_eval")
+    cluster_id: str | None = Field(default=None)

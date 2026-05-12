@@ -521,13 +521,42 @@ def test_eval_result_json_carries_bucket_field(tmp_path: Path):
 
 
 def test_load_eval_dataset_carries_declared_buckets():
-    """Reviewed dataset declares all three governance buckets; loader must
-    surface them all (including the empty ambiguous bucket) so the runner
-    can pre-populate breakdown entries."""
+    """Reviewed dataset's three governance manifests declare three buckets;
+    loader must surface them all (including the empty ambiguous bucket) so
+    the runner can pre-populate breakdown entries. The paraphrase manifest
+    sitting in the same directory must NOT leak in — its source_dataset
+    points at a different dataset, so it's a phantom bucket here."""
     dataset = _load_eval_dataset(Path("datasets/eval_dataset_reviewed.json"))
-    assert "formal_eval" in dataset.declared_buckets
-    assert "failure_case_eval" in dataset.declared_buckets
-    assert "ambiguous_or_unexpressible_eval" in dataset.declared_buckets
+    assert dataset.declared_buckets == frozenset({
+        "formal_eval",
+        "failure_case_eval",
+        "ambiguous_or_unexpressible_eval",
+    })
+
+
+def test_load_eval_dataset_paraphrase_excludes_reviewed_buckets():
+    """Symmetric guard: when loading the paraphrase dataset, the reviewed
+    manifests must not leak in as phantom 0/0 buckets."""
+    dataset = _load_eval_dataset(Path("datasets/eval_dataset_paraphrase.json"))
+    assert dataset.declared_buckets == frozenset({"paraphrase_eval"})
+
+
+def test_reviewed_run_bucket_breakdown_excludes_paraphrase_bucket(tmp_path: Path):
+    """Regression: prior to source_dataset filtering, every manifest in
+    ``datasets/`` was loaded for every run, so a reviewed-dataset run's
+    bucket_breakdown contained a phantom ``paraphrase_eval: 0/0`` entry.
+    This pins the fix end-to-end."""
+    summary = run_smoke_eval(
+        dataset_path=Path("datasets/smoke_eval_dataset.json"),
+        llm=_scripted_llm(),
+        github=_fake_github(),
+        log_root=tmp_path / "logs",
+        eval_artifacts_root=tmp_path / "eval",
+        eval_run_id="no_paraphrase_leak",
+        model_name="gpt-4.1-mini",
+        provider_name="openai",
+    )
+    assert "paraphrase_eval" not in summary.bucket_breakdown
 
 
 def test_summary_includes_declared_but_empty_bucket(tmp_path: Path):

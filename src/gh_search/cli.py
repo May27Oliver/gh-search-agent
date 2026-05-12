@@ -203,19 +203,39 @@ def _cmd_smoke(args: argparse.Namespace) -> int:
         max_turns=cfg.max_turns,
     )
 
+    # When the dataset contains no formal_eval items (e.g. paraphrase-only run),
+    # `headline_total=0` makes "0/0 (0.00%)" look like a fail when it actually
+    # means "headline accuracy is not applicable to this run". Surface that
+    # distinction at the display layer; the runner contract is untouched.
+    if summary.headline_total == 0:
+        headline_line = "  headline=n/a (no formal_eval items)"
+    else:
+        headline_line = (
+            f"  headline={summary.headline_correct}/{summary.headline_total}"
+            f" ({summary.headline_accuracy:.2%})  # formal_eval only"
+        )
+
     bucket_summary = ", ".join(
         f"{name}={stats.correct}/{stats.total}"
         for name, stats in sorted(summary.bucket_breakdown.items())
     ) or "(none)"
+
+    cluster_lines = ""
+    if summary.cluster_breakdown:
+        cluster_pairs = ", ".join(
+            f"{cid}={stats.correct}/{stats.total}"
+            + (" all_match" if stats.all_match else f" variants={stats.predicted_variants}")
+            for cid, stats in sorted(summary.cluster_breakdown.items())
+        )
+        cluster_lines = f"\n  clusters: {cluster_pairs}"
+
     print(
         f"[{eval_run_id}] model={summary.model_name}\n"
-        f"  headline={summary.headline_correct}/{summary.headline_total}"
-        f" ({summary.headline_accuracy:.2%})  "
-        f"# formal_eval only\n"
+        f"{headline_line}\n"
         f"  processed={summary.processed_correct}/{summary.processed_total}"
-        f" ({summary.processed_accuracy:.2%})  "
-        f"# all buckets\n"
-        f"  buckets: {bucket_summary}\n"
+        f" ({summary.processed_accuracy:.2%})  # all buckets\n"
+        f"  buckets: {bucket_summary}"
+        f"{cluster_lines}\n"
         f"  outcomes={summary.outcome_counts}"
     )
     return 0 if summary.processed_correct == summary.processed_total else 1

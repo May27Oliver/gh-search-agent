@@ -116,6 +116,7 @@ def test_smoke_defaults_eval_run_id_to_model_plus_timestamp(
         headline_accuracy=1.0,
         outcome_counts={"success": 3},
         bucket_breakdown={},
+        cluster_breakdown={},
     )
 
     with patch("gh_search.cli._default_eval_run_id", return_value="gpt-4.1-mini_20260425T010203Z"):

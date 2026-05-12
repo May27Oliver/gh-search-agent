@@ -19,7 +19,7 @@ from gh_search.eval.scorer import score_item
 from gh_search.github import GitHubClient, Repository
 from gh_search.llm import LLMJsonCall
 from gh_search.logger import SessionLogger
-from gh_search.normalizers import KEYWORD_RULES_VERSION
+from gh_search.normalizers import KEYWORD_RULES_VERSION, normalize_keywords
 from gh_search.retrieval import (
     build_retrieval_artifact,
     has_retrieval_data,
@@ -66,6 +66,40 @@ class BucketStats:
 
 
 @dataclass(frozen=True)
+class ClusterStats:
+    """單一 paraphrase cluster 的成績（不可變）。
+
+    Paraphrase 桶的核心契約是「同 cluster 裡每一句不同寫法都要落到同一個
+    `StructuredQuery` target」。BucketStats 報的是每題 per-paraphrase 的
+    對錯計數，但**真正在衡量 robustness 的單位是 cluster**：4 句改寫只要
+    有一句歪掉，這個 cluster 就還沒被當作 robust。
+
+    欄位語意：
+    - ``total``：cluster 內 paraphrase 數量
+    - ``correct``：對 GT exact match 的 paraphrase 數
+    - ``all_match``：cluster 過關判準（所有 paraphrase 都對 GT 才 True）
+    - ``predicted_variants``：cluster 內出現的相異預測數量。配合
+      ``all_match`` 可以辨別：
+
+      | all_match | predicted_variants | 含義 |
+      | --------- | ------------------ | --- |
+      | True      | 1                  | cluster 完美過關 |
+      | False     | 1                  | 一致但錯：parser 規則本身要修 |
+      | False     | >1                 | 不一致：robustness 不足，需加 alias / normalizer |
+
+    判讀變數計算用 scorer 同一套 `normalize_keywords()`，所以
+    ``[react, component]`` 和 ``[component, react]`` 算同一 variant；
+    null prediction 視為自己的 variant。
+    """
+
+    cluster_id: str
+    total: int
+    correct: int
+    all_match: bool
+    predicted_variants: int
+
+
+@dataclass(frozen=True)
 class SmokeSummary:
     eval_run_id: str
     model_name: str
@@ -78,6 +112,7 @@ class SmokeSummary:
     headline_accuracy: float
     outcome_counts: dict[str, int]
     bucket_breakdown: dict[str, BucketStats]
+    cluster_breakdown: dict[str, ClusterStats]
 
 
 @dataclass(frozen=True)
@@ -136,6 +171,8 @@ def run_smoke_eval(
 
     outcome_counts: dict[str, int] = {}
     bucket_totals: dict[str, list[int]] = {}
+    # cluster_tallies[cluster_id] = {"total": int, "correct": int, "variant_keys": set}
+    cluster_tallies: dict[str, dict] = {}
     per_item_entries: list[dict] = []
 
     with per_item_path.open("a", encoding="utf-8") as per_item_fp:
@@ -184,6 +221,19 @@ def run_smoke_eval(
             stats[0] += 1
             if score.is_correct:
                 stats[1] += 1
+
+            cluster_id = item.get("cluster_id")
+            if cluster_id is not None:
+                tally = cluster_tallies.setdefault(
+                    cluster_id,
+                    {"total": 0, "correct": 0, "variant_keys": set()},
+                )
+                tally["total"] += 1
+                if score.is_correct:
+                    tally["correct"] += 1
+                tally["variant_keys"].add(
+                    _normalized_prediction_key(final_state.structured_query)
+                )
 
             _write_session_finalization(
                 session_logger=session_logger,
@@ -246,6 +296,18 @@ def run_smoke_eval(
         HEADLINE_BUCKET, BucketStats(total=0, correct=0, accuracy=0.0)
     )
 
+    cluster_breakdown: dict[str, ClusterStats] = {}
+    for cluster_id, tally in sorted(cluster_tallies.items()):
+        total = tally["total"]
+        correct = tally["correct"]
+        cluster_breakdown[cluster_id] = ClusterStats(
+            cluster_id=cluster_id,
+            total=total,
+            correct=correct,
+            all_match=(total > 0 and correct == total),
+            predicted_variants=len(tally["variant_keys"]),
+        )
+
     summary = SmokeSummary(
         eval_run_id=eval_run_id,
         model_name=model_name,
@@ -258,6 +320,7 @@ def run_smoke_eval(
         headline_accuracy=headline.accuracy,
         outcome_counts=outcome_counts,
         bucket_breakdown=bucket_breakdown,
+        cluster_breakdown=cluster_breakdown,
     )
 
     (run_dir / "model_summary.json").write_text(
@@ -287,6 +350,15 @@ def run_smoke_eval(
                         "accuracy": stats.accuracy,
                     }
                     for name, stats in bucket_breakdown.items()
+                },
+                "cluster_breakdown": {
+                    cluster_id: {
+                        "total": stats.total,
+                        "correct": stats.correct,
+                        "all_match": stats.all_match,
+                        "predicted_variants": stats.predicted_variants,
+                    }
+                    for cluster_id, stats in cluster_breakdown.items()
                 },
             },
             indent=2,
@@ -326,23 +398,36 @@ def _write_run_config(
 
 def _load_bucket_index(
     manifests_dir: Path,
+    dataset_path: Path | None = None,
 ) -> tuple[dict[str, str], frozenset[str]]:
-    """Read every `*_qids.json` manifest in a directory.
+    """Read every ``*_qids.json`` manifest in a directory.
 
     Returns ``(qid_to_bucket, declared_buckets)``:
 
     - ``qid_to_bucket``: mapping from qid to the bucket name that owns it
-    - ``declared_buckets``: every bucket name declared by any manifest in
-      this directory, **including buckets whose qid list is empty**
+    - ``declared_buckets``: every bucket name declared by any manifest that
+      passed the dataset filter, **including buckets whose qid list is empty**
 
     Manifests are the single source of truth for which bucket a qid lives in.
-    Three classes of error must surface immediately rather than silently
-    fall back to ``formal_eval`` (which would pollute headline accuracy):
+    Five classes of error must surface immediately rather than silently fall
+    back to ``formal_eval`` (which would pollute headline accuracy):
 
     1. malformed manifest payload (not a JSON object)
     2. ``bucket`` field missing or not a string
     3. ``qids`` field missing or not a list
-    4. the same qid declared by two manifests with conflicting buckets
+    4. when ``dataset_path`` is given: ``source_dataset`` field missing or
+       not a string
+    5. the same qid declared by two manifests with conflicting buckets
+
+    Bucket isolation: when ``dataset_path`` is given, only manifests whose
+    ``source_dataset`` basename matches ``dataset_path.name`` are loaded.
+    Otherwise a paraphrase manifest sitting in the same directory as the
+    reviewed-dataset manifests would inject ``paraphrase_eval`` into a
+    reviewed-dataset run's ``bucket_breakdown`` as ``0/0`` — a phantom
+    bucket that the dataset never had any items in. Passing ``None``
+    keeps the legacy "load every manifest in the directory" behaviour,
+    used by governance tests that exercise loader invariants without
+    binding to a specific dataset.
     """
     qid_to_bucket: dict[str, str] = {}
     declared_buckets: set[str] = set()
@@ -368,6 +453,16 @@ def _load_bucket_index(
                 f"manifest {path} has invalid 'qids' field: expected list, "
                 f"got {type(qids).__name__}"
             )
+        if dataset_path is not None:
+            source = payload.get("source_dataset")
+            if not isinstance(source, str):
+                raise ValueError(
+                    f"manifest {path} requires a 'source_dataset' string "
+                    f"when loaded for a specific dataset; "
+                    f"got {type(source).__name__}"
+                )
+            if Path(source).name != Path(dataset_path).name:
+                continue
         declared_buckets.add(bucket)
         for qid in qids:
             if qid in qid_to_bucket and qid_to_bucket[qid] != bucket:
@@ -413,7 +508,9 @@ def _load_eval_dataset(
 
     if manifests_dir is None:
         manifests_dir = Path(dataset_path).parent
-    qid_to_bucket, declared_buckets = _load_bucket_index(manifests_dir)
+    qid_to_bucket, declared_buckets = _load_bucket_index(
+        manifests_dir, dataset_path=Path(dataset_path)
+    )
     items_with_bucket = [
         {**item, "bucket": qid_to_bucket.get(item.get("id"), HEADLINE_BUCKET)}
         for item in items
@@ -450,6 +547,8 @@ def _per_item_entry(
         "eval_run_id": eval_run_id,
         "eval_item_id": item["id"],
         "bucket": item.get("bucket", HEADLINE_BUCKET),
+        "cluster_id": item.get("cluster_id"),
+        "rewrite_kind": item.get("rewrite_kind"),
         "model_name": model_name,
         "provider_name": provider_name,
         "run_id": run_id,
@@ -535,6 +634,7 @@ def _write_session_finalization(
         is_correct=score.is_correct,
         created_at=_now(),
         bucket=item.get("bucket", HEADLINE_BUCKET),
+        cluster_id=item.get("cluster_id"),
     )
     (session_logger.session_dir / "eval_result.json").write_text(
         eval_result.model_dump_json(indent=2)
@@ -544,3 +644,31 @@ def _write_session_finalization(
 def _now() -> str:
     """Return the current UTC timestamp in ISO 8601 form."""
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+def _normalized_prediction_key(query: StructuredQuery | None) -> tuple:
+    """Return a hashable key representing a prediction for variant counting.
+
+    Two predictions hash to the same key iff they are equivalent under the
+    scorer's normalization rules — keywords are routed through
+    ``normalize_keywords()`` then sorted, and enum values are unwrapped.
+    A ``None`` prediction (parser refused / errored) gets its own marker so
+    it counts as a distinct variant. Used by paraphrase cluster aggregation
+    to compute ``predicted_variants``.
+    """
+    if query is None:
+        return ("__no_prediction__",)
+    keywords = tuple(
+        sorted(normalize_keywords(list(query.keywords), language=query.language))
+    )
+    return (
+        keywords,
+        (query.language or "").lower() if query.language else None,
+        query.created_after,
+        query.created_before,
+        query.min_stars,
+        query.max_stars,
+        query.sort.value if query.sort is not None else None,
+        query.order.value if query.order is not None else None,
+        query.limit,
+    )

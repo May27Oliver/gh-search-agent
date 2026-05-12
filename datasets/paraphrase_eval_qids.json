@@ -1,0 +1,15 @@
+{
+  "bucket": "paraphrase_eval",
+  "description": "Paraphrase robustness clusters — different wordings of the same intent that must converge to one structured query. Each cluster_id groups paraphrases sharing one canonical ground_truth_structured_query; cluster passes only when every paraphrase matches that GT (per-paraphrase exact match is the same logic as formal_eval, just aggregated cluster-level too).",
+  "source_dataset": "datasets/eval_dataset_paraphrase.json",
+  "qids": [
+    "para_stars_lb_500_more_than",
+    "para_stars_lb_500_over",
+    "para_stars_lb_500_gt_symbol",
+    "para_stars_lb_500_zh_sentence",
+    "para_rank_pop_popular",
+    "para_rank_pop_top",
+    "para_rank_pop_most_starred",
+    "para_rank_pop_ranked_by"
+  ]
+}

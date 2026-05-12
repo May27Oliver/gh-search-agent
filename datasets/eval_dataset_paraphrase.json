@@ -1,0 +1,160 @@
+{
+  "metadata": {
+    "reference_date": "2026-04-23",
+    "description": "Paraphrase clusters: same intent, different wording. Every paraphrase in a cluster must converge to the cluster's shared ground_truth_structured_query. Governance tests pin intra-cluster GT consistency and the presence of both token-level and sentence-level rewrites."
+  },
+  "items": [
+    {
+      "id": "para_stars_lb_500_more_than",
+      "input_query": "react component libraries with more than 500 stars",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "stars_lower_bound_500",
+      "rewrite_kind": "canonical",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": 501,
+        "max_stars": null,
+        "sort": null,
+        "order": null,
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_stars_lb_500_over",
+      "input_query": "react component libraries with over 500 stars",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "stars_lower_bound_500",
+      "rewrite_kind": "token",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": 501,
+        "max_stars": null,
+        "sort": null,
+        "order": null,
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_stars_lb_500_gt_symbol",
+      "input_query": "react component libraries with > 500 stars",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "stars_lower_bound_500",
+      "rewrite_kind": "token",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": 501,
+        "max_stars": null,
+        "sort": null,
+        "order": null,
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_stars_lb_500_zh_sentence",
+      "input_query": "找一些 star 超過 500 的 react component library",
+      "case_type": "paraphrase",
+      "language": "zh-TW",
+      "cluster_id": "stars_lower_bound_500",
+      "rewrite_kind": "sentence",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": 501,
+        "max_stars": null,
+        "sort": null,
+        "order": null,
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_rank_pop_popular",
+      "input_query": "popular react component libraries",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "ranking_intent_popular",
+      "rewrite_kind": "canonical",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": null,
+        "max_stars": null,
+        "sort": "stars",
+        "order": "desc",
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_rank_pop_top",
+      "input_query": "top react component libraries",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "ranking_intent_popular",
+      "rewrite_kind": "token",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": null,
+        "max_stars": null,
+        "sort": "stars",
+        "order": "desc",
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_rank_pop_most_starred",
+      "input_query": "most starred react component libraries",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "ranking_intent_popular",
+      "rewrite_kind": "token",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": null,
+        "max_stars": null,
+        "sort": "stars",
+        "order": "desc",
+        "limit": 10
+      }
+    },
+    {
+      "id": "para_rank_pop_ranked_by",
+      "input_query": "react component libraries ranked by stars",
+      "case_type": "paraphrase",
+      "language": "en",
+      "cluster_id": "ranking_intent_popular",
+      "rewrite_kind": "sentence",
+      "ground_truth_structured_query": {
+        "keywords": ["react", "component", "library"],
+        "language": null,
+        "created_after": null,
+        "created_before": null,
+        "min_stars": null,
+        "max_stars": null,
+        "sort": "stars",
+        "order": "desc",
+        "limit": 10
+      }
+    }
+  ]
+}
