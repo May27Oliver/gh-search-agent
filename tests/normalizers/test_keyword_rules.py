@@ -909,3 +909,127 @@ class TestIter8MultilingualSharedContract:
         }
         assert normalized == ["react", "sample"]
         assert flagged == {"project", "japanese"}
+
+
+# ---------------------------------------------------------------------------
+# Hardening rule layer classification
+# ---------------------------------------------------------------------------
+
+
+class TestRuleLayerClassification:
+    """Pins which hardening layer each issue code (and per-token override)
+    belongs to. See `RuleLayer` for the semantic contract — domain-stable
+    means principled / cross-dataset, dataset-backed means evidence is
+    limited to current eval qids."""
+
+    def test_alias_typo_is_dataset_backed(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["pythn"])
+        alias = [i for i in issues if i.code == "alias_applied"]
+        assert len(alias) == 1
+        assert alias[0].layer == RuleLayer.DATASET_BACKED
+
+    def test_alias_standard_abbreviation_is_domain_stable(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        for token in ["js", "ts", "py", "rb", "pg", "postgres"]:
+            issues = find_keyword_violations([token])
+            alias = [i for i in issues if i.code == "alias_applied"]
+            assert len(alias) == 1, f"no alias issue for {token!r}"
+            assert alias[0].layer == RuleLayer.DOMAIN_STABLE, (
+                f"{token!r} should be DOMAIN_STABLE"
+            )
+
+    def test_modifier_ranking_word_is_domain_stable(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        for token in ["popular", "top", "best", "trending", "newest"]:
+            issues = find_keyword_violations([token])
+            modifier = [i for i in issues if i.code == "modifier_stopword"]
+            assert any(
+                m.layer == RuleLayer.DOMAIN_STABLE for m in modifier
+            ), f"{token!r} should be DOMAIN_STABLE"
+
+    def test_modifier_subjective_decoration_is_dataset_backed(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        for token in ["cool", "good", "small", "recent", "open source"]:
+            issues = find_keyword_violations([token])
+            modifier = [i for i in issues if i.code == "modifier_stopword"]
+            assert any(
+                m.layer == RuleLayer.DATASET_BACKED for m in modifier
+            ), f"{token!r} should be DATASET_BACKED"
+
+    def test_decoration_stopword_is_dataset_backed(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["implementations"])
+        decoration = [i for i in issues if i.code == "decoration_stopword"]
+        assert len(decoration) == 1
+        assert decoration[0].layer == RuleLayer.DATASET_BACKED
+
+    def test_cjk_multilingual_canonicalization_is_dataset_backed(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["爬蟲套件"])
+        ml = [i for i in issues if i.code == "multilingual_canonicalization"]
+        assert ml and all(i.layer == RuleLayer.DATASET_BACKED for i in ml)
+
+    def test_phrase_split_is_domain_stable(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["ruby", "on", "rails"])
+        phrase = [i for i in issues if i.code == "phrase_split"]
+        assert len(phrase) == 1
+        assert phrase[0].layer == RuleLayer.DOMAIN_STABLE
+
+    def test_language_leak_is_domain_stable(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["python"], language="Python")
+        leak = [i for i in issues if i.code == "language_leak"]
+        assert len(leak) == 1
+        assert leak[0].layer == RuleLayer.DOMAIN_STABLE
+
+    def test_qualifier_in_keyword_is_domain_stable(self) -> None:
+        from gh_search.schemas import RuleLayer
+
+        issues = find_keyword_violations(["stars:>=100"])
+        qual = [i for i in issues if i.code == "qualifier_in_keyword"]
+        assert len(qual) == 1
+        assert qual[0].layer == RuleLayer.DOMAIN_STABLE
+
+    def test_unknown_code_raises_in_classify_issue(self) -> None:
+        from gh_search.normalizers.keyword_rules import classify_issue
+
+        with pytest.raises(ValueError, match="unclassified hardening rule code"):
+            classify_issue("not_a_real_code", token=None)
+
+    def test_every_emitted_code_has_a_classification(self) -> None:
+        """Defensive: drive every emission path and assert layer is set.
+        Catches the case where a new code is added to find_keyword_violations
+        without updating the classify_issue dispatch."""
+        # Mix of inputs that together cover all 9 codes the function emits.
+        test_inputs: list[tuple[list[str], str | None]] = [
+            (["pythn"], None),                  # alias_applied
+            (["frameworks"], None),             # plural_drift
+            (["popular"], None),                # modifier_stopword
+            (["implementations"], None),        # decoration_stopword
+            (["爬蟲套件"], None),                # multilingual_canonicalization
+            (["sample", "project", "japanese"], None),  # multilingual_context_drop
+            (["python"], "Python"),             # language_leak
+            (["ruby", "on", "rails"], None),    # phrase_split
+            (["stars:>=100"], None),            # qualifier_in_keyword
+        ]
+        all_codes_seen: set[str] = set()
+        for keywords, language in test_inputs:
+            issues = find_keyword_violations(keywords, language=language)
+            for issue in issues:
+                all_codes_seen.add(issue.code)
+                assert issue.layer is not None, (
+                    f"emitted issue {issue.code!r} has no layer"
+                )
+        assert len(all_codes_seen) >= 9, (
+            f"expected to cover all 9 codes, saw {sorted(all_codes_seen)}"
+        )

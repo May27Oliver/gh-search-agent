@@ -32,7 +32,16 @@ KEYWORD_RULES_VERSION = "kw-rules-v1"
 
 
 class ValidationIssue(BaseModel):
-    """Structured validation output shared by all validators (§8.0.5)."""
+    """Structured validation output shared by all validators (§8.0.5).
+
+    ``layer`` classifies the hardening rule behind this issue as either
+    ``DOMAIN_STABLE`` (principled, expected to hold across any reasonable
+    repository-search dataset) or ``DATASET_BACKED`` (currently effective
+    but evidence limited to a few items in the current eval). It is **not**
+    a severity flag and **not** an outcome marker — see
+    :class:`gh_search.schemas.enums.RuleLayer`. ``None`` means the emitting
+    site has not yet been classified.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -41,6 +50,17 @@ class ValidationIssue(BaseModel):
     field: str | None = None
     token: str | None = None
     replacement: str | None = None
+    layer: "RuleLayer | None" = None
+
+
+# Import RuleLayer AFTER ValidationIssue is defined: ``gh_search.schemas``
+# package init pulls ValidationIssue from this module, so the class must
+# exist before we trigger schemas-package loading via this import. The
+# forward-ref ``layer: "RuleLayer | None"`` is resolved by model_rebuild()
+# below once RuleLayer is in module scope.
+from gh_search.schemas.enums import RuleLayer  # noqa: E402
+
+ValidationIssue.model_rebuild()
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +244,106 @@ _PHRASES_LONGEST_FIRST: tuple[tuple[str, ...], ...] = tuple(
 # the structured facets. Dropped by Stage 2 of `normalize_keywords` and
 # reported as `qualifier_in_keyword` by `find_keyword_violations`.
 _QUALIFIER_TOKEN_RE: re.Pattern[str] = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*:.+")
+
+
+# ---------------------------------------------------------------------------
+# Hardening rule layer classification
+# ---------------------------------------------------------------------------
+#
+# Each emitted ValidationIssue carries a ``layer`` field so trace consumers
+# can tell apart rules we believe generalize (``DOMAIN_STABLE``) from rules
+# whose evidence is just a few qids in the current eval (``DATASET_BACKED``).
+# See ``RuleLayer`` for the semantic contract.
+#
+# Layout: family default + sparse override. Each rule family has a default
+# layer for the typical entry, plus an explicit override map for entries
+# whose evidence pattern differs. The override maps are deliberately short
+# so reviewers can audit them at a glance.
+
+# Codes whose entire family fires under one layer — no per-token override
+# needed. These cover ~7 of the 9 issue codes ``find_keyword_violations``
+# emits; the remaining two (``alias_applied``, ``modifier_stopword``) need
+# per-token classification because individual entries straddle layers.
+_FIXED_LAYER_BY_CODE: Mapping[str, RuleLayer] = MappingProxyType(
+    {
+        # English plural drift — cross-domain orthographic rule.
+        "plural_drift": RuleLayer.DOMAIN_STABLE,
+        # Decoration drops — anchored to specific qids per ITER7_DECORATION_CLEANUP_SPEC.
+        "decoration_stopword": RuleLayer.DATASET_BACKED,
+        # iter8 CJK / Japanese compound rewrites — each anchored to q027/q028/q029.
+        "multilingual_canonicalization": RuleLayer.DATASET_BACKED,
+        "multilingual_context_drop": RuleLayer.DATASET_BACKED,
+        # Principled invariants — independent of eval contents.
+        "language_leak": RuleLayer.DOMAIN_STABLE,
+        "phrase_split": RuleLayer.DOMAIN_STABLE,
+        "qualifier_in_keyword": RuleLayer.DOMAIN_STABLE,
+    }
+)
+
+# ``alias_applied`` — typos are dataset-anchored; standard programming-language
+# abbreviations are cross-domain.
+_ALIAS_LAYER_DEFAULT = RuleLayer.DATASET_BACKED
+_ALIAS_LAYER_OVERRIDES: Mapping[str, RuleLayer] = MappingProxyType(
+    {
+        # Standard programming-language abbreviations — domain-stable.
+        "js": RuleLayer.DOMAIN_STABLE,
+        "ts": RuleLayer.DOMAIN_STABLE,
+        "py": RuleLayer.DOMAIN_STABLE,
+        "rb": RuleLayer.DOMAIN_STABLE,
+        "pg": RuleLayer.DOMAIN_STABLE,
+        "postgres": RuleLayer.DOMAIN_STABLE,
+        # Everything else in ``_ALIAS_MAP`` (typos + multilingual aliases) stays
+        # at the default DATASET_BACKED — typos are anchored to q023-q026 and
+        # multilingual aliases are anchored to q027-q029 per ITER8 §3.2.
+    }
+)
+
+# ``modifier_stopword`` — ranking-intent words are cross-domain; subjective
+# decoration words (``cool``, ``good``, ``small``) and time-semantics words
+# (``recent``) are dataset-anchored, even though for different reasons.
+_MODIFIER_STOPWORD_LAYER_DEFAULT = RuleLayer.DOMAIN_STABLE
+_MODIFIER_STOPWORD_LAYER_OVERRIDES: Mapping[str, RuleLayer] = MappingProxyType(
+    {
+        # Subjective decoration — too heuristic to call domain-stable.
+        "cool": RuleLayer.DATASET_BACKED,
+        "good": RuleLayer.DATASET_BACKED,
+        "small": RuleLayer.DATASET_BACKED,
+        # Has time semantics that current schema cannot stably express;
+        # dropping it is a conservative heuristic, not a stable rule.
+        "recent": RuleLayer.DATASET_BACKED,
+        # Has content semantics; treating it as a stopword is heuristic
+        # because GitHub search has no facet for licensing/openness.
+        "open source": RuleLayer.DATASET_BACKED,
+    }
+)
+
+
+def classify_issue(code: str, token: str | None) -> RuleLayer:
+    """Return the hardening-rule layer for one issue emitted by ``find_keyword_violations``.
+
+    Lookup order:
+      1. If ``code`` has a fixed layer for its entire family
+         (``_FIXED_LAYER_BY_CODE``), return that layer.
+      2. Otherwise, the code is one of ``alias_applied`` /
+         ``modifier_stopword`` whose entries straddle layers — consult the
+         per-token override map; fall back to the family's default layer.
+
+    Unknown codes raise ``ValueError`` so a future code added to
+    ``find_keyword_violations`` cannot quietly emit issues with a None
+    layer; governance tests assert classification stays exhaustive.
+    """
+    if code in _FIXED_LAYER_BY_CODE:
+        return _FIXED_LAYER_BY_CODE[code]
+    if code == "alias_applied":
+        return _ALIAS_LAYER_OVERRIDES.get(token or "", _ALIAS_LAYER_DEFAULT)
+    if code == "modifier_stopword":
+        return _MODIFIER_STOPWORD_LAYER_OVERRIDES.get(
+            token or "", _MODIFIER_STOPWORD_LAYER_DEFAULT
+        )
+    raise ValueError(
+        f"unclassified hardening rule code: {code!r}; add it to "
+        f"_FIXED_LAYER_BY_CODE or define a per-token override map"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +671,10 @@ def find_keyword_violations(
                 )
             )
 
-    return issues
+    return [
+        issue.model_copy(update={"layer": classify_issue(issue.code, issue.token)})
+        for issue in issues
+    ]
 
 
 # ---------------------------------------------------------------------------

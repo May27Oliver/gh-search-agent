@@ -12,12 +12,15 @@ to keep a single source of truth (§3.3 read-only SSoT path).
 from __future__ import annotations
 
 import re
+from types import MappingProxyType
+from typing import Mapping
 
 from gh_search.normalizers import normalize_keywords
 from gh_search.normalizers.keyword_rules import _LANGUAGE_TOKEN_TO_FACET
 from gh_search.schemas import (
     Control,
     OrderDir,
+    RuleLayer,
     SharedAgentState,
     SortField,
     StructuredQuery,
@@ -27,6 +30,28 @@ from gh_search.schemas import (
     ValidationIssue,
 )
 from gh_search.validator import validate_structured_query
+
+
+# Layer classification for each post-parse mutation helper that
+# `_normalize_structured_query` invokes. Documentation only — these
+# mutations do not yet emit per-rule ValidationIssue entries, so the layer
+# is not surfaced in trace artifacts today. A future change is expected to
+# add a mutation-trace stream and tag each emitted event with its layer;
+# this constant pins what those tags should be so the wiring change is
+# mechanical.
+#
+# All three helpers below are domain-stable: they apply principled rewrites
+# that don't depend on the current eval dataset's content. Note that one
+# pattern inside `_normalize_ranking` (the bare `熱門` regex) is anchored
+# only to q027 — that's noted in the docstring there for when per-pattern
+# layering arrives.
+_MUTATION_RULE_LAYERS: Mapping[str, RuleLayer] = MappingProxyType(
+    {
+        "_suppress_unsupported_language": RuleLayer.DOMAIN_STABLE,
+        "_normalize_star_bounds": RuleLayer.DOMAIN_STABLE,
+        "_normalize_ranking": RuleLayer.DOMAIN_STABLE,
+    }
+)
 
 
 def validate_query(state: SharedAgentState) -> SharedAgentState:

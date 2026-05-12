@@ -784,3 +784,47 @@ def test_iter11_does_not_clear_existing_sort_when_no_intent() -> None:
     assert new_state.structured_query.sort.value == "updated"
     assert new_state.structured_query.order is not None
     assert new_state.structured_query.order.value == "desc"
+
+
+# Mutation-rule layer classification — documentation-only constant for now;
+# the coverage assertion below makes sure it stays in sync with what
+# `_normalize_structured_query` actually calls, so a future trace-stream
+# wiring change is mechanical.
+
+
+def test_mutation_rule_layers_constant_exists_and_is_typed() -> None:
+    from gh_search.schemas import RuleLayer
+    from gh_search.tools.validate_query import _MUTATION_RULE_LAYERS
+
+    assert _MUTATION_RULE_LAYERS, "_MUTATION_RULE_LAYERS must not be empty"
+    for name, layer in _MUTATION_RULE_LAYERS.items():
+        assert isinstance(name, str), f"key {name!r} is not str"
+        assert isinstance(layer, RuleLayer), (
+            f"layer for {name!r} must be a RuleLayer, got {type(layer).__name__}"
+        )
+
+
+def test_mutation_rule_layers_covers_every_helper_normalize_calls() -> None:
+    """Coverage check: keys of `_MUTATION_RULE_LAYERS` must match the
+    underscore-prefixed helpers `_normalize_structured_query` actually calls.
+    Catches drift if someone adds a new mutation helper without updating
+    the layer map."""
+    import inspect
+    import re
+
+    from gh_search.tools.validate_query import (
+        _MUTATION_RULE_LAYERS,
+        _normalize_structured_query,
+    )
+
+    source = inspect.getsource(_normalize_structured_query)
+    # Match function-call shape so string mentions inside docstrings/comments
+    # don't count.
+    called = set(re.findall(r"(_(?:normalize|suppress)_\w+)\(", source))
+    called.discard("_normalize_structured_query")
+    layered = set(_MUTATION_RULE_LAYERS)
+    assert called == layered, (
+        f"_MUTATION_RULE_LAYERS coverage drift — "
+        f"_normalize_structured_query calls: {sorted(called)}, "
+        f"_MUTATION_RULE_LAYERS has: {sorted(layered)}"
+    )

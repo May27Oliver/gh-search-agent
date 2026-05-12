@@ -48,3 +48,26 @@ class TerminateReason(str, Enum):
     VALIDATION_FAILED = "validation_failed"
     MAX_TURNS_EXCEEDED = "max_turns_exceeded"
     EXECUTION_FAILED = "execution_failed"
+
+
+class RuleLayer(str, Enum):
+    """Classification of a hardening rule's confidence / evidence basis.
+
+    Two layers, distinguishing rules we believe generalize from rules that
+    are currently effective only because the eval dataset happens to anchor
+    them:
+
+    - ``DOMAIN_STABLE``: principled rule we expect to hold across any
+      reasonable repository-search dataset. Lifetime is unbounded; rule
+      stays even if the current eval is replaced.
+    - ``DATASET_BACKED``: currently effective but evidence is limited to
+      a few items in the current eval. Generalization is not yet
+      established; keeping the rule is acceptable for now but it should
+      be revisited as the dataset grows.
+
+    This is **not** a severity flag and **not** an outcome marker. It says
+    "what kind of evidence supports this rule existing", nothing else.
+    """
+
+    DOMAIN_STABLE = "domain_stable"
+    DATASET_BACKED = "dataset_backed"
